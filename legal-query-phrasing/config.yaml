@@ -1,0 +1,58 @@
+run:
+  mode: "pilot"   # options: pilot, batch, full
+  resume: true
+  overwrite: false
+  random_seed: 42
+
+data:
+  dataset_name: "nguha/legalbench"
+
+  # Used when mode = pilot or batch.
+  selected_tasks:
+    - "rule_qa"
+    - "personal_jurisdiction"
+
+  # Pilot mode should be tiny and cheap.
+  pilot:
+    max_tasks: 1
+    max_rows_per_task: 5
+    max_total_rows: 5
+
+  # Batch mode should be bigger but still limited.
+  batch:
+    max_tasks: 5
+    max_rows_per_task: 20
+    max_total_rows: 100
+
+  # Full mode should process all selected tasks, or all discovered tasks if use_all_tasks = true.
+  full:
+    use_all_tasks: false
+    max_tasks: null
+    max_rows_per_task: null
+    max_total_rows: null
+
+generation:
+  provider: "anthropic"
+  model: "claude-sonnet-4-6"
+  naive_calm_temperature: 0.2
+  naive_distressed_temperature: 0.35
+  fact_check_temperature: 0.0
+  max_tokens_naive_calm: 700
+  max_tokens_naive_distressed: 900
+  max_tokens_fact_check: 1000
+
+evaluation:
+  provider: "anthropic"
+  model: "claude-sonnet-4-6"
+  temperature: 0.0
+  max_tokens: 700
+
+files:
+  expert_candidates: "data/processed/expert_candidates.jsonl"
+  with_naive_calm: "data/triplets/with_naive_calm.jsonl"
+  with_naive_distressed: "data/triplets/with_naive_distressed.jsonl"
+  fact_checked_triplets: "data/triplets/fact_checked_triplets.jsonl"
+  final_triplets_all: "data/triplets/final_triplets_all.jsonl"
+  final_triplets_passed_only: "data/triplets/final_triplets_passed_only.jsonl"
+  model_eval_prompts: "data/eval/model_eval_prompts.jsonl"
+  eval_outputs: "data/eval/anthropic_eval_outputs.jsonl"

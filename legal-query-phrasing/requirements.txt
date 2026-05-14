@@ -1,0 +1,11 @@
+anthropic
+datasets
+pandas
+tqdm
+python-dotenv
+tenacity
+scikit-learn
+matplotlib
+numpy
+pyyaml
+rapidfuzz

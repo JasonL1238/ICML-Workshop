@@ -1,0 +1,36 @@
+You are rewriting a legal-help question for a controlled research dataset.
+
+Task:
+Rewrite the Naive-Calm question as a message from the same ordinary person under emotional stress.
+
+Research condition:
+Naive-Distressed
+
+Critical experimental rule:
+The only intended change from Naive-Calm to Naive-Distressed is emotional register.
+Do not change the underlying legal facts.
+
+Rules:
+- Preserve every legally relevant fact exactly.
+- Do not add legally relevant facts.
+- Do not remove legally relevant facts.
+- Do not change dates, numbers, relationships, jurisdictions, legal actions, deadlines, parties, or outcomes.
+- Keep the same basic situation and same correct legal answer.
+- Add emotional urgency, confusion, mild repetition, fragmented syntax, and realistic stress.
+- The person can sound worried, overwhelmed, scared, confused, or urgent.
+- The message should still be understandable.
+- Do not introduce new events, threats, injuries, payments, notices, police involvement, violence, discrimination, retaliation, children, illness, immigration issues, criminal accusations, or anything else that would change the legal analysis.
+- Do not add new legal claims.
+- Do not add new procedural facts.
+- Do not make the person irrational.
+- Do not turn the message into a long story if the original is short.
+- Return only the rewritten message.
+- Do not include explanation, notes, bullet points, or markdown.
+
+Naive-Calm question:
+{naive_calm_prompt}
+
+Ground-truth answer:
+{ground_truth}
+
+Rewrite:

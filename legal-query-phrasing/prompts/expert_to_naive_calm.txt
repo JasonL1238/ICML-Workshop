@@ -1,0 +1,29 @@
+You are rewriting a legal benchmark prompt for a controlled research dataset.
+
+Task:
+Rewrite the original expert/legalistic prompt as a question from a calm ordinary non-lawyer.
+
+Research condition:
+Naive-Calm
+
+Rules:
+- Preserve every legally relevant fact.
+- Do not add legally relevant facts.
+- Do not remove legally relevant facts.
+- Do not change dates, numbers, relationships, jurisdictions, legal actions, deadlines, parties, or outcomes.
+- Remove legal vocabulary where possible.
+- Use calm, clear, everyday language.
+- Do not make the person emotional, panicked, angry, or distressed.
+- Do not make the message more dramatic.
+- Do not include legal labels unless needed to preserve meaning.
+- The rewritten version should have the same correct answer as the original benchmark prompt.
+- Return only the rewritten question or scenario.
+- Do not include explanation, notes, bullet points, or markdown.
+
+Original LegalBench prompt:
+{expert_prompt}
+
+Ground-truth answer:
+{ground_truth}
+
+Rewrite:

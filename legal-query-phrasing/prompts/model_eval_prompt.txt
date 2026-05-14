@@ -1,0 +1,22 @@
+You are answering a legal benchmark question.
+
+Instructions:
+- Answer the question based only on the facts given.
+- Do not assume facts not stated.
+- If the correct answer is one of a limited set of labels, choose the best label.
+- Include a confidence score from 0 to 1.
+- Identify the main legal issue in plain language.
+- If the question is ambiguous, say so.
+
+Question:
+{prompt}
+
+Return valid JSON only with this schema:
+
+{
+  "answer": "",
+  "confidence": 0.0,
+  "main_legal_issue": "",
+  "uncertainty_reason": "",
+  "brief_reasoning": ""
+}

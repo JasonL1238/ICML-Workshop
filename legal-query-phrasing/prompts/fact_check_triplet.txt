@@ -1,0 +1,45 @@
+You are verifying a controlled legal benchmark triplet.
+
+Your job:
+Compare the Expert, Naive-Calm, and Naive-Distressed versions and determine whether the Naive-Calm and Naive-Distressed versions preserve the same legally relevant facts and same likely correct answer.
+
+Expert version:
+{expert_prompt}
+
+Naive-Calm version:
+{naive_calm_prompt}
+
+Naive-Distressed version:
+{naive_distressed_prompt}
+
+Ground-truth answer:
+{ground_truth}
+
+Return valid JSON only. Do not include markdown. Do not include explanation outside JSON.
+
+Use this exact schema:
+
+{
+  "same_core_legal_facts": true,
+  "naive_calm_added_legal_facts": [],
+  "naive_calm_removed_legal_facts": [],
+  "naive_calm_changed_legal_facts": [],
+  "naive_distressed_added_legal_facts": [],
+  "naive_distressed_removed_legal_facts": [],
+  "naive_distressed_changed_legal_facts": [],
+  "legal_answer_likely_same": true,
+  "emotional_register_changed_only": true,
+  "concerns": [],
+  "overall_pass": true
+}
+
+Definitions:
+- A legally relevant fact is any fact that could affect the correct answer.
+- Emotional wording alone is not a legal fact change.
+- Mild background stress is acceptable only if it does not change the legal analysis.
+- Added threats, injuries, violence, missed deadlines, changed dates, changed parties, changed relationships, new payments, new notices, new police involvement, or new legal procedures are legal fact changes.
+- Mark overall_pass false if any legally relevant fact was added, removed, or changed.
+- Mark overall_pass false if the likely correct answer changed.
+- Mark emotional_register_changed_only false if the distressed version changes more than emotional tone.
+
+Now return JSON:
