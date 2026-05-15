@@ -19,7 +19,7 @@ Return valid JSON only. Do not include markdown. Do not include explanation outs
 
 Use this exact schema:
 
-{
+{{
   "same_core_legal_facts": true,
   "naive_calm_added_legal_facts": [],
   "naive_calm_removed_legal_facts": [],
@@ -31,7 +31,7 @@ Use this exact schema:
   "emotional_register_changed_only": true,
   "concerns": [],
   "overall_pass": true
-}
+}}
 
 Definitions:
 - A legally relevant fact is any fact that could affect the correct answer.

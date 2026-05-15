@@ -23,6 +23,7 @@ from config_utils import (
     should_overwrite,
     should_resume,
 )
+from task_inventory import is_learned_hands
 from utils import (
     append_jsonl,
     call_claude,
@@ -83,38 +84,59 @@ def main() -> None:
     if limit is not None:
         pending = pending[:limit]
 
+    skipped_learned_hands = 0
+
     for row in tqdm(pending, desc="Generating Naive-Calm"):
-        filled = template.format(
-            expert_prompt=row["expert_prompt"],
-            ground_truth=row["ground_truth"],
-        )
+        task_name = row.get("legalbench_task", "")
 
         out_row = dict(row)
         out_row.update(meta)
-        out_row["generation_model_naive_calm"] = model
-        out_row["temperature_naive_calm"] = temperature
         out_row["word_count_expert"] = word_count(row["expert_prompt"])
         out_row["provider"] = config["generation"]["provider"]
 
-        try:
-            text, usage = call_claude(filled, model=model, temperature=temperature, max_tokens=max_tokens)
-            out_row["naive_calm_prompt"] = text.strip()
-            out_row["naive_calm_raw_response"] = text
-            out_row["word_count_naive_calm"] = word_count(text.strip())
-            out_row["naive_calm_error"] = None
-            out_row["naive_calm_usage"] = usage
-        except Exception as e:
-            out_row["naive_calm_prompt"] = None
+        if is_learned_hands(task_name):
+            # Already in layperson language — copy expert_prompt as naive_calm
+            out_row["naive_calm_prompt"] = row["expert_prompt"]
             out_row["naive_calm_raw_response"] = None
-            out_row["word_count_naive_calm"] = 0
-            out_row["naive_calm_error"] = str(e)
+            out_row["word_count_naive_calm"] = word_count(row["expert_prompt"])
+            out_row["naive_calm_error"] = None
             out_row["naive_calm_usage"] = None
-            print(f"  ERROR on {row['item_id']}: {e}")
+            out_row["generation_model_naive_calm"] = None
+            out_row["temperature_naive_calm"] = None
+            out_row["naive_calm_is_original"] = True
+            skipped_learned_hands += 1
+        else:
+            out_row["generation_model_naive_calm"] = model
+            out_row["temperature_naive_calm"] = temperature
+            out_row["naive_calm_is_original"] = False
+
+            filled = template.format(
+                expert_prompt=row["expert_prompt"],
+                ground_truth=row["ground_truth"],
+            )
+
+            try:
+                text, usage = call_claude(filled, model=model, temperature=temperature, max_tokens=max_tokens)
+                out_row["naive_calm_prompt"] = text.strip()
+                out_row["naive_calm_raw_response"] = text
+                out_row["word_count_naive_calm"] = word_count(text.strip())
+                out_row["naive_calm_error"] = None
+                out_row["naive_calm_usage"] = usage
+            except Exception as e:
+                out_row["naive_calm_prompt"] = None
+                out_row["naive_calm_raw_response"] = None
+                out_row["word_count_naive_calm"] = 0
+                out_row["naive_calm_error"] = str(e)
+                out_row["naive_calm_usage"] = None
+                print(f"  ERROR on {row['item_id']}: {e}")
 
         append_jsonl(output_path, out_row)
         processed += 1
 
     print(f"\nProcessed: {processed}")
+    if skipped_learned_hands:
+        print(f"  Learned Hands (copied as-is): {skipped_learned_hands}")
+        print(f"  API rewrites:                 {processed - skipped_learned_hands}")
     print(f"Output:    {output_path}")
 
 

@@ -15,9 +15,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from config_utils import (
     add_common_args,
+    get_eval_split,
     get_limit,
     get_run_limits,
     get_selected_tasks,
+    get_task_group,
     is_dry_run,
     load_config,
     merge_cli_overrides,
@@ -139,16 +141,19 @@ def main() -> None:
     limits = get_run_limits(config)
     tasks = get_selected_tasks(config)
 
-    # For full mode with use_all_tasks, load inventory to get task list
+    # Fall back to full inventory if task list is still empty
     if not tasks:
         inv_path = PROJECT_ROOT / "data" / "processed" / "legalbench_inventory.csv"
         if not inv_path.exists():
             print("ERROR: No selected tasks and no inventory file found.")
-            print("Run 01_inventory_legalbench.py first, or specify --selected-tasks.")
+            print("Run 01_inventory_legalbench.py first, or specify --selected-tasks / --task-group.")
             sys.exit(1)
         inv_df = pd.read_csv(inv_path)
         tasks = inv_df[inv_df["success"] == True]["task"].tolist()  # noqa: E712
         print(f"  Loaded {len(tasks)} tasks from inventory.")
+
+    print(f"  Task group:  {get_task_group(config)}")
+    print(f"  Tasks:       {len(tasks)}")
 
     # Apply max_tasks limit
     if limits["max_tasks"] is not None:
@@ -196,8 +201,12 @@ def main() -> None:
             skipped_tasks.append({"task": task_name, "reason": f"load error: {e}", "columns": ""})
             continue
 
-        # Find usable split
-        for split_name in ["test", "train", "validation"]:
+        # Prefer the configured eval split (default: "test") per LegalBench methodology
+        preferred_split = get_eval_split(config)
+        split_priority = [preferred_split] + [
+            s for s in ["test", "train", "validation"] if s != preferred_split
+        ]
+        for split_name in split_priority:
             if split_name in ds:
                 split_ds = ds[split_name]
                 break

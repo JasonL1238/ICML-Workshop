@@ -24,6 +24,7 @@ from config_utils import (
     should_overwrite,
     should_resume,
 )
+from task_inventory import is_learned_hands
 from utils import (
     PROJECT_ROOT,
     append_jsonl,
@@ -97,40 +98,83 @@ def main() -> None:
     if limit is not None:
         pending = pending[:limit]
 
-    for row in tqdm(pending, desc="Fact-checking triplets"):
-        filled = template.format(
-            expert_prompt=row["expert_prompt"],
-            naive_calm_prompt=row["naive_calm_prompt"],
-            naive_distressed_prompt=row["naive_distressed_prompt"],
-            ground_truth=row["ground_truth"],
-        )
+    auto_passed_learned_hands = 0
 
+    for row in tqdm(pending, desc="Fact-checking triplets"):
+        task_name = row.get("legalbench_task", "")
         out_row = dict(row)
         out_row.update(meta)
         out_row["fact_check_model"] = model
         out_row["fact_check_temperature"] = temperature
 
-        try:
-            text, usage = call_claude(filled, model=model, temperature=temperature, max_tokens=max_tokens)
-            parsed, raw = safe_parse_json(text)
-            out_row["fact_check_raw_response"] = raw
-            out_row["fact_check_usage"] = usage
+        if is_learned_hands(task_name) and row.get("naive_calm_is_original"):
+            # Expert == Naive-Calm for learned_hands; only distressed was generated.
+            # Auto-pass the naive-calm side; still fact-check distressed vs original.
+            filled = template.format(
+                expert_prompt=row["expert_prompt"],
+                naive_calm_prompt=row["naive_calm_prompt"],
+                naive_distressed_prompt=row["naive_distressed_prompt"],
+                ground_truth=row["ground_truth"],
+            )
+            try:
+                text, usage = call_claude(filled, model=model, temperature=temperature, max_tokens=max_tokens)
+                parsed, raw = safe_parse_json(text)
+                out_row["fact_check_raw_response"] = raw
+                out_row["fact_check_usage"] = usage
 
-            if parsed is not None:
-                out_row["fact_check_result"] = parsed
-                out_row["fact_check_pass"] = parsed.get("overall_pass", False)
-                out_row["fact_check_error"] = None
-            else:
+                if parsed is not None:
+                    # Override naive-calm fields since they're identical to expert
+                    parsed["naive_calm_added_legal_facts"] = []
+                    parsed["naive_calm_removed_legal_facts"] = []
+                    parsed["naive_calm_changed_legal_facts"] = []
+                    out_row["fact_check_result"] = parsed
+                    out_row["fact_check_pass"] = parsed.get("overall_pass", False)
+                    out_row["fact_check_error"] = None
+                else:
+                    out_row["fact_check_result"] = None
+                    out_row["fact_check_pass"] = False
+                    out_row["fact_check_error"] = "JSON parse failed"
+            except Exception as e:
+                out_row["fact_check_raw_response"] = None
                 out_row["fact_check_result"] = None
                 out_row["fact_check_pass"] = False
-                out_row["fact_check_error"] = "JSON parse failed"
-        except Exception as e:
-            out_row["fact_check_raw_response"] = None
-            out_row["fact_check_result"] = None
-            out_row["fact_check_pass"] = False
-            out_row["fact_check_error"] = str(e)
-            out_row["fact_check_usage"] = None
-            print(f"  ERROR on {row['item_id']}: {e}")
+                out_row["fact_check_error"] = str(e)
+                out_row["fact_check_usage"] = None
+                print(f"  ERROR on {row['item_id']}: {e}")
+
+            out_row["fact_check_learned_hands_auto_calm"] = True
+            auto_passed_learned_hands += 1
+        else:
+            filled = template.format(
+                expert_prompt=row["expert_prompt"],
+                naive_calm_prompt=row["naive_calm_prompt"],
+                naive_distressed_prompt=row["naive_distressed_prompt"],
+                ground_truth=row["ground_truth"],
+            )
+
+            out_row["fact_check_learned_hands_auto_calm"] = False
+
+            try:
+                text, usage = call_claude(filled, model=model, temperature=temperature, max_tokens=max_tokens)
+                parsed, raw = safe_parse_json(text)
+                out_row["fact_check_raw_response"] = raw
+                out_row["fact_check_usage"] = usage
+
+                if parsed is not None:
+                    out_row["fact_check_result"] = parsed
+                    out_row["fact_check_pass"] = parsed.get("overall_pass", False)
+                    out_row["fact_check_error"] = None
+                else:
+                    out_row["fact_check_result"] = None
+                    out_row["fact_check_pass"] = False
+                    out_row["fact_check_error"] = "JSON parse failed"
+            except Exception as e:
+                out_row["fact_check_raw_response"] = None
+                out_row["fact_check_result"] = None
+                out_row["fact_check_pass"] = False
+                out_row["fact_check_error"] = str(e)
+                out_row["fact_check_usage"] = None
+                print(f"  ERROR on {row['item_id']}: {e}")
 
         if not out_row["fact_check_pass"]:
             concerns = ""
@@ -159,6 +203,8 @@ def main() -> None:
     passed = sum(1 for r in read_jsonl(output_path) if r.get("fact_check_pass"))
     total = len(read_jsonl(output_path))
     print(f"\nProcessed this run: {processed}")
+    if auto_passed_learned_hands:
+        print(f"  Learned Hands (calm auto-passed): {auto_passed_learned_hands}")
     print(f"Total in output:    {total}")
     print(f"Passed:             {passed}")
     print(f"Failed:             {total - passed}")

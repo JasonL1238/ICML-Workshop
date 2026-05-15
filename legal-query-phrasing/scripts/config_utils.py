@@ -12,6 +12,8 @@ import yaml
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG = PROJECT_ROOT / "config.yaml"
 
+VALID_TASK_GROUPS = ("main", "appendix", "all-filtered")
+
 
 # ---------------------------------------------------------------------------
 # Load & validate
@@ -42,6 +44,12 @@ def add_common_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--max-total-rows", type=int, help="Override max total rows")
     parser.add_argument("--max-rows-per-task", type=int, help="Override max rows per task")
     parser.add_argument("--selected-tasks", nargs="+", help="Override selected tasks list")
+    parser.add_argument(
+        "--task-group",
+        choices=list(VALID_TASK_GROUPS),
+        default=None,
+        help="Task group: main (A2J-relevant subset, default), appendix, all-filtered",
+    )
     parser.add_argument("--resume", action="store_true", default=None, help="Resume from existing output")
     parser.add_argument("--no-resume", action="store_true", default=None, help="Disable resume")
     parser.add_argument("--overwrite", action="store_true", default=False, help="Overwrite existing output")
@@ -60,6 +68,9 @@ def merge_cli_overrides(config: dict, args: argparse.Namespace) -> dict:
     if args.mode is not None:
         cfg["run"]["mode"] = args.mode
 
+    if getattr(args, "task_group", None) is not None:
+        cfg["run"]["task_group"] = args.task_group
+
     if args.resume is True:
         cfg["run"]["resume"] = True
     elif getattr(args, "no_resume", None) is True:
@@ -70,6 +81,7 @@ def merge_cli_overrides(config: dict, args: argparse.Namespace) -> dict:
 
     if args.selected_tasks is not None:
         cfg["data"]["selected_tasks"] = args.selected_tasks
+        cfg["_explicit_selected_tasks"] = True
 
     mode = cfg["run"]["mode"]
     mode_cfg = cfg["data"].get(mode, {})
@@ -110,15 +122,39 @@ def get_run_limits(config: dict) -> dict[str, Any]:
     }
 
 
-def get_selected_tasks(config: dict) -> list[str]:
-    """Return the task list for the current mode.
+def get_task_group(config: dict) -> str:
+    """Return the active task group (default: 'main')."""
+    return config.get("run", {}).get("task_group", "main")
 
-    For pilot/batch: data.selected_tasks.
-    For full with use_all_tasks: returns empty list (caller should use inventory).
+
+def get_eval_split(config: dict) -> str:
+    """Return the preferred dataset split for evaluation (default: 'test')."""
+    return config.get("data", {}).get("eval_split", "test")
+
+
+def get_selected_tasks(config: dict) -> list[str]:
+    """Return the task list for the current run.
+
+    Resolution order:
+      1. Explicit --selected-tasks on CLI  →  use those verbatim
+      2. --task-group (or config run.task_group)  →  resolve via task_inventory
+      3. Legacy full-mode use_all_tasks  →  empty list (caller uses inventory)
+      4. data.selected_tasks from config.yaml
     """
+    if config.get("_explicit_selected_tasks"):
+        return list(config["data"].get("selected_tasks", []))
+
+    from task_inventory import get_tasks_for_group
+
+    group = get_task_group(config)
+    try:
+        return get_tasks_for_group(group)
+    except ValueError:
+        pass
+
     limits = get_run_limits(config)
     if limits["mode"] == "full" and limits["use_all_tasks"]:
-        return []  # caller fetches all configs
+        return []
     return list(config["data"].get("selected_tasks", []))
 
 
@@ -147,9 +183,13 @@ def print_run_header(config: dict, output_path: Path | str) -> None:
     """Print a standard run-configuration summary."""
     limits = get_run_limits(config)
     tasks = get_selected_tasks(config)
+    group = get_task_group(config)
+    eval_split = get_eval_split(config)
     print("=" * 60)
     print(f"  Run mode:           {limits['mode']}")
-    print(f"  Selected tasks:     {tasks or '(all tasks from inventory)'}")
+    print(f"  Task group:         {group}")
+    print(f"  Eval split:         {eval_split}")
+    print(f"  Selected tasks:     {len(tasks)} task(s)")
     print(f"  Max tasks:          {limits['max_tasks']}")
     print(f"  Max rows per task:  {limits['max_rows_per_task']}")
     print(f"  Max total rows:     {limits['max_total_rows']}")
@@ -168,6 +208,8 @@ def run_metadata(config: dict) -> dict:
     limits = get_run_limits(config)
     return {
         "run_mode": limits["mode"],
+        "task_group": get_task_group(config),
+        "eval_split": get_eval_split(config),
         "config_path": config.get("_config_path", ""),
         "selected_tasks": get_selected_tasks(config),
         "max_rows_per_task": limits["max_rows_per_task"],

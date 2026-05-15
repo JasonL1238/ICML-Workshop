@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run Claude evaluation on all three conditions (Expert, Naive-Calm, Naive-Distressed)."""
+"""Secondary evaluation: JSON-structured answers + confidence (not primary accuracy)."""
 
 from __future__ import annotations
 
@@ -25,7 +25,6 @@ from config_utils import (
 from utils import (
     append_jsonl,
     call_claude,
-    handle_output_file,
     load_env,
     load_prompt_template,
     read_jsonl,
@@ -34,7 +33,9 @@ from utils import (
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run model evaluation with Claude.")
+    parser = argparse.ArgumentParser(
+        description="Structured JSON evaluation with confidence (secondary analysis)."
+    )
     add_common_args(parser)
     args = parser.parse_args()
 
@@ -69,13 +70,17 @@ def main() -> None:
         print(f"\n[DRY RUN] Would evaluate up to {n} prompts. No API calls made.")
         return
 
-    done_ids = handle_output_file(
-        output_path, should_resume(config), should_overwrite(config)
-    )
-    # Use eval_id for this script's resume tracking
-    if output_path.exists() and should_resume(config):
-        existing = read_jsonl(output_path)
-        done_ids = {r["eval_id"] for r in existing if "eval_id" in r}
+    done_ids: set[str] = set()
+    if output_path.exists():
+        if should_overwrite(config):
+            output_path.unlink()
+        elif not should_resume(config):
+            raise FileExistsError(
+                f"Output file already exists: {output_path}\n"
+                "Use --resume to continue or --overwrite to replace."
+            )
+        else:
+            done_ids = {r["eval_id"] for r in read_jsonl(output_path) if r.get("eval_id")}
 
     if done_ids:
         print(f"  Resuming: {len(done_ids)} eval_ids already completed.")
@@ -88,7 +93,7 @@ def main() -> None:
     if limit is not None:
         pending = pending[:limit]
 
-    for row in tqdm(pending, desc="Evaluating"):
+    for row in tqdm(pending, desc="Structured eval"):
         filled = template.format(prompt=row["prompt"])
 
         out_row = {
@@ -104,7 +109,9 @@ def main() -> None:
         }
 
         try:
-            text, usage = call_claude(filled, model=model, temperature=temperature, max_tokens=max_tokens)
+            text, usage = call_claude(
+                filled, model=model, temperature=temperature, max_tokens=max_tokens
+            )
             parsed, raw = safe_parse_json(text)
             out_row["model_raw_output"] = raw
             out_row["eval_usage"] = usage

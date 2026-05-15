@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""Score model evaluation outputs by comparing parsed answers to ground truth.
-
-NOTE: This is a first-pass scorer using simple string normalization.
-Some LegalBench tasks may require task-specific scoring logic (e.g., partial
-matches, multi-label tasks, or structured answer formats). Review results
-manually and add task-specific scoring as needed for the final paper.
-"""
+"""Score structured JSON evaluation outputs (secondary confidence pipeline)."""
 
 from __future__ import annotations
 
@@ -46,7 +40,9 @@ def normalize_answer(text: str) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Score model evaluation outputs.")
+    parser = argparse.ArgumentParser(
+        description="Score structured confidence evaluation outputs."
+    )
     add_common_args(parser)
     args = parser.parse_args()
 
@@ -59,7 +55,7 @@ def main() -> None:
 
     if not input_path.exists():
         print(f"ERROR: Input file not found: {input_path}")
-        print("Run 07_run_model_eval_anthropic.py first.")
+        print("Run 10_run_structured_confidence_eval_anthropic.py first.")
         sys.exit(1)
 
     rows = read_jsonl(input_path)
@@ -99,7 +95,6 @@ def main() -> None:
     df.to_csv(csv_out, index=False)
     write_jsonl(jsonl_out, scored)
 
-    # Print summary
     total = len(df)
     correct_total = df["correct"].sum()
     print(f"\nOverall accuracy: {correct_total}/{total} ({correct_total / total:.1%})" if total else "\nNo data.")

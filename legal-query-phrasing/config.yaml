@@ -4,10 +4,19 @@ run:
   overwrite: false
   random_seed: 42
 
+  # Which task group to evaluate.  Overridable via --task-group.
+  # Options: main (default), appendix, all-filtered
+  task_group: "main"
+
 data:
   dataset_name: "nguha/legalbench"
 
-  # Used when mode = pilot or batch.
+  # Preferred evaluation split.  LegalBench provides train + test;
+  # we use the test split for all evaluation to stay faithful to the
+  # benchmark methodology.
+  eval_split: "test"
+
+  # Manual override – only used when task_group is not set.
   selected_tasks:
     - "rule_qa"
     - "personal_jurisdiction"
@@ -46,6 +55,8 @@ evaluation:
   model: "claude-sonnet-4-6"
   temperature: 0.0
   max_tokens: 700
+  # Short completions for LegalBench-style exact prompts (script 08).
+  legalbench_exact_max_tokens: 50
 
 files:
   expert_candidates: "data/processed/expert_candidates.jsonl"
@@ -56,3 +67,6 @@ files:
   final_triplets_passed_only: "data/triplets/final_triplets_passed_only.jsonl"
   model_eval_prompts: "data/eval/model_eval_prompts.jsonl"
   eval_outputs: "data/eval/anthropic_eval_outputs.jsonl"
+  legalbench_exact_eval_prompts: "data/eval/legalbench_exact_eval_prompts.jsonl"
+  legalbench_exact_anthropic_outputs: "data/eval/legalbench_exact_anthropic_outputs.jsonl"
+  legalbench_exact_scored_outputs: "data/eval/legalbench_exact_scored_outputs.csv"
