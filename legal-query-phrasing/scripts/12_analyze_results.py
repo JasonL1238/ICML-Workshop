@@ -14,8 +14,14 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from config_utils import add_common_args, get_task_group, load_config, merge_cli_overrides, resolve_file
-from task_inventory import get_tasks_for_group, is_learned_hands
+from config_utils import (
+    add_common_args,
+    get_tasks_for_scoring_filter,
+    load_config,
+    merge_cli_overrides,
+    resolve_file,
+)
+from task_inventory import is_learned_hands
 from utils import ensure_dirs
 
 CONDITION_ORDER = ["expert", "naive_calm", "naive_distressed"]
@@ -54,18 +60,13 @@ def main() -> None:
     df = pd.read_csv(input_path)
     print(f"Loaded {len(df)} scored rows from {input_path}.")
 
-    # Filter to active task group
-    group = get_task_group(config)
-    try:
-        group_tasks = set(get_tasks_for_group(group))
-    except ValueError:
-        group_tasks = None
+    group_tasks = get_tasks_for_scoring_filter(config)
 
     if group_tasks is not None:
         before = len(df)
         df = df[df["legalbench_task"].isin(group_tasks)]
         if len(df) < before:
-            print(f"  Filtered to task group '{group}': {len(df)}/{before} rows.")
+            print(f"  Filtered to configured tasks ({len(group_tasks)} names): {len(df)}/{before} rows.")
 
     # -----------------------------------------------------------------------
     # Table 1: Accuracy by condition

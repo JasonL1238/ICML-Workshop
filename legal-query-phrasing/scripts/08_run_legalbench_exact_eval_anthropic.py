@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Run Claude on LegalBench-exact prompts (single user message, short completion)."""
+"""Run Claude on LegalBench-exact prompts (single user message, short completion).
+
+Supports --batch flag to use the Anthropic Message Batches API (50% cheaper).
+"""
 
 from __future__ import annotations
 
@@ -37,6 +40,7 @@ def main() -> None:
         description="Run Anthropic model on legalbench_exact_eval_prompts.jsonl."
     )
     add_common_args(parser)
+    parser.add_argument("--batch", action="store_true", help="Use Anthropic Batch API (50%% cheaper, async)")
     args = parser.parse_args()
 
     config = load_config(args.config)
@@ -55,6 +59,7 @@ def main() -> None:
     print(f"  Temperature: {temperature}")
     print(f"  Max tokens:  {max_tokens}")
     print(f"  Input:       {input_path}")
+    print(f"  Batch mode:  {args.batch}")
 
     if not input_path.exists():
         print(f"ERROR: Input not found: {input_path}")
@@ -92,6 +97,19 @@ def main() -> None:
     if limit is not None:
         pending = pending[:limit]
 
+    if args.batch:
+        _run_batch(pending, model, temperature, max_tokens, output_path)
+    else:
+        _run_sequential(pending, model, temperature, max_tokens, output_path)
+
+
+def _run_sequential(
+    pending: list[dict],
+    model: str,
+    temperature: float,
+    max_tokens: int,
+    output_path: Path,
+) -> None:
     processed = 0
     for row in tqdm(pending, desc="LegalBench-exact eval"):
         out_row: dict = {
@@ -128,6 +146,62 @@ def main() -> None:
         processed += 1
 
     print(f"\nProcessed: {processed}")
+    print(f"Output:    {output_path}")
+
+
+def _run_batch(
+    pending: list[dict],
+    model: str,
+    temperature: float,
+    max_tokens: int,
+    output_path: Path,
+) -> None:
+    from batch_utils import BatchRequest, run_batch_and_wait
+
+    batch_requests = []
+    for row in pending:
+        batch_requests.append(BatchRequest(
+            custom_id=row["eval_id"],
+            prompt=row["final_prompt"],
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        ))
+
+    results = run_batch_and_wait(batch_requests, script_name="08_legalbench_exact")
+
+    results_map = {r.custom_id: r for r in results}
+
+    for row in pending:
+        out_row: dict = {
+            "eval_id": row["eval_id"],
+            "item_id": row["item_id"],
+            "legalbench_task": row.get("legalbench_task", ""),
+            "domain": row.get("domain", ""),
+            "condition": row["condition"],
+            "ground_truth": row.get("ground_truth", ""),
+            "final_prompt": row.get("final_prompt", ""),
+            "eval_model": model,
+            "temperature": temperature,
+        }
+
+        result = results_map.get(row["eval_id"])
+        if result and result.success:
+            out_row["model_raw_output"] = result.text
+            out_row["parsed_answer"] = parsed_answer_from_raw(result.text)
+            out_row["token_usage"] = result.usage
+            out_row["eval_error"] = None
+        else:
+            error_msg = result.error if result else "No result returned from batch"
+            out_row["model_raw_output"] = None
+            out_row["parsed_answer"] = ""
+            out_row["token_usage"] = None
+            out_row["eval_error"] = error_msg
+            print(f"  ERROR {row['eval_id']}: {error_msg}")
+
+        append_jsonl(output_path, out_row)
+
+    print(f"\nProcessed (batch): {len(pending)}")
     print(f"Output:    {output_path}")
 
 

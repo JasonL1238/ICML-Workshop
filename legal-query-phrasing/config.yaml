@@ -1,12 +1,15 @@
 run:
-  mode: "pilot"   # options: pilot, batch, full
+  mode: "full"   # options: pilot, batch, full — ICML workshop: full pipeline with 11 tasks × up to 50 rows
   resume: true
   overwrite: false
   random_seed: 42
 
-  # Which task group to evaluate.  Overridable via --task-group.
-  # Options: main (default), appendix, all-filtered
-  task_group: "main"
+  # When true: use only data.selected_tasks below (order preserved).
+  # task_group is ignored for task selection; do not rely on main/appendix inventory.
+  use_selected_tasks_only: true
+
+  # Informational only while use_selected_tasks_only is true (for logs / metadata).
+  task_group: "explicit"
 
 data:
   dataset_name: "nguha/legalbench"
@@ -16,10 +19,19 @@ data:
   # benchmark methodology.
   eval_split: "test"
 
-  # Manual override – only used when task_group is not set.
+  # Eleven LegalBench tasks (diversity_1 intentionally excluded). Caps below apply per task.
   selected_tasks:
-    - "rule_qa"
+    - "telemarketing_sales_rule"
+    - "ucc_v_common_law"
     - "personal_jurisdiction"
+    - "hearsay"
+    - "diversity_2"
+    - "proa"
+    - "international_citizenship_questions"
+    - "successor_liability"
+    - "nys_judicial_ethics"
+    - "sara_entailment"
+    - "unfair_tos"
 
   # Pilot mode should be tiny and cheap.
   pilot:
@@ -33,11 +45,12 @@ data:
     max_rows_per_task: 20
     max_total_rows: 100
 
-  # Full mode should process all selected tasks, or all discovered tasks if use_all_tasks = true.
+  # Full mode: all 11 tasks, up to 50 test rows each (first rows in split order after filters).
+  # max_total_rows null = no cross-task early stop (all tasks get their own cap).
   full:
     use_all_tasks: false
     max_tasks: null
-    max_rows_per_task: null
+    max_rows_per_task: 50
     max_total_rows: null
 
 generation:
@@ -51,8 +64,8 @@ generation:
   max_tokens_fact_check: 1000
 
 evaluation:
-  provider: "anthropic"
-  model: "claude-sonnet-4-6"
+  provider: "openai"
+  model: "gpt-5.4"
   temperature: 0.0
   max_tokens: 700
   # Short completions for LegalBench-style exact prompts (script 08).

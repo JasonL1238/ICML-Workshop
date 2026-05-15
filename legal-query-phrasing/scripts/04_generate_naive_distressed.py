@@ -3,6 +3,8 @@
 
 IMPORTANT: Naive-Distressed is generated from naive_calm_prompt, NOT from expert_prompt.
 This preserves the experimental design: Expert -> Naive-Calm -> Naive-Distressed.
+
+Supports --batch flag to use the Anthropic Message Batches API (50% cheaper).
 """
 
 from __future__ import annotations
@@ -41,6 +43,7 @@ from utils import (
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generate Naive-Distressed rewrites.")
     add_common_args(parser)
+    parser.add_argument("--batch", action="store_true", help="Use Anthropic Batch API (50%% cheaper, async)")
     args = parser.parse_args()
 
     config = load_config(args.config)
@@ -59,6 +62,7 @@ def main() -> None:
     print(f"  Temperature: {temperature}")
     print(f"  Max tokens:  {max_tokens}")
     print(f"  Input:       {input_path}")
+    print(f"  Batch mode:  {args.batch}")
 
     if not input_path.exists():
         print(f"ERROR: Input file not found: {input_path}")
@@ -68,7 +72,6 @@ def main() -> None:
     input_rows = read_jsonl(input_path)
     print(f"  Input rows:  {len(input_rows)}")
 
-    # Skip rows where Naive-Calm generation failed
     valid_rows = [r for r in input_rows if r.get("naive_calm_prompt")]
     skipped_no_calm = len(input_rows) - len(valid_rows)
     if skipped_no_calm:
@@ -87,14 +90,30 @@ def main() -> None:
     template = load_prompt_template("prompts/naive_calm_to_distressed.txt")
     meta = run_metadata(config)
     limit = get_limit(config)
-    processed = 0
 
     pending = [r for r in valid_rows if r["item_id"] not in done_ids]
     if limit is not None:
         pending = pending[:limit]
 
+    if args.batch:
+        _run_batch(pending, template, meta, config, model, temperature, max_tokens, output_path)
+    else:
+        _run_sequential(pending, template, meta, config, model, temperature, max_tokens, output_path)
+
+
+def _run_sequential(
+    pending: list[dict],
+    template: str,
+    meta: dict,
+    config: dict,
+    model: str,
+    temperature: float,
+    max_tokens: int,
+    output_path: Path,
+) -> None:
+    processed = 0
+
     for row in tqdm(pending, desc="Generating Naive-Distressed"):
-        # Critical: generate from naive_calm_prompt, not expert_prompt
         filled = template.format(
             naive_calm_prompt=row["naive_calm_prompt"],
             ground_truth=row["ground_truth"],
@@ -125,6 +144,65 @@ def main() -> None:
         processed += 1
 
     print(f"\nProcessed: {processed}")
+    print(f"Output:    {output_path}")
+
+
+def _run_batch(
+    pending: list[dict],
+    template: str,
+    meta: dict,
+    config: dict,
+    model: str,
+    temperature: float,
+    max_tokens: int,
+    output_path: Path,
+) -> None:
+    from batch_utils import BatchRequest, run_batch_and_wait
+
+    batch_requests = []
+    for row in pending:
+        filled = template.format(
+            naive_calm_prompt=row["naive_calm_prompt"],
+            ground_truth=row["ground_truth"],
+        )
+        batch_requests.append(BatchRequest(
+            custom_id=row["item_id"],
+            prompt=filled,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        ))
+
+    results = run_batch_and_wait(batch_requests, script_name="04_naive_distressed")
+
+    results_map = {r.custom_id: r for r in results}
+
+    for row in pending:
+        out_row = dict(row)
+        out_row.update(meta)
+        out_row["generation_model_naive_distressed"] = model
+        out_row["temperature_naive_distressed"] = temperature
+        out_row["provider"] = config["generation"]["provider"]
+
+        result = results_map.get(row["item_id"])
+        if result and result.success:
+            out_row["naive_distressed_prompt"] = result.text.strip()
+            out_row["naive_distressed_raw_response"] = result.text
+            out_row["word_count_naive_distressed"] = word_count(result.text.strip())
+            out_row["naive_distressed_error"] = None
+            out_row["naive_distressed_usage"] = result.usage
+        else:
+            error_msg = result.error if result else "No result returned from batch"
+            out_row["naive_distressed_prompt"] = None
+            out_row["naive_distressed_raw_response"] = None
+            out_row["word_count_naive_distressed"] = 0
+            out_row["naive_distressed_error"] = error_msg
+            out_row["naive_distressed_usage"] = None
+            print(f"  ERROR on {row['item_id']}: {error_msg}")
+
+        append_jsonl(output_path, out_row)
+
+    print(f"\nProcessed (batch): {len(pending)}")
     print(f"Output:    {output_path}")
 
 

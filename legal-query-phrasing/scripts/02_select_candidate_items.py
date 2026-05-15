@@ -44,7 +44,18 @@ from utils import (
 # Column detection
 # ---------------------------------------------------------------------------
 
-PROMPT_CANDIDATES = ["input", "text", "question", "prompt", "query", "context", "scenario"]
+# "contract" / "policy": LegalBench tasks that encode the fact pattern in a contract/policy column.
+PROMPT_CANDIDATES = [
+    "input",
+    "text",
+    "question",
+    "prompt",
+    "query",
+    "context",
+    "scenario",
+    "contract",
+    "policy",
+]
 ANSWER_CANDIDATES = ["answer", "label", "output", "target", "correct_answer"]
 
 

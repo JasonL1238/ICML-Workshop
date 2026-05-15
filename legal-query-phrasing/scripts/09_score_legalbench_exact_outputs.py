@@ -18,8 +18,13 @@ import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from config_utils import add_common_args, get_task_group, load_config, merge_cli_overrides, resolve_file
-from task_inventory import get_tasks_for_group
+from config_utils import (
+    add_common_args,
+    get_tasks_for_scoring_filter,
+    load_config,
+    merge_cli_overrides,
+    resolve_file,
+)
 from utils import ensure_dirs, read_jsonl
 
 
@@ -53,18 +58,14 @@ def main() -> None:
     rows = read_jsonl(input_path)
     print(f"Loaded {len(rows)} rows.")
 
-    # Optionally filter to the active task group
-    group = get_task_group(config)
-    try:
-        group_tasks = set(get_tasks_for_group(group))
-    except ValueError:
-        group_tasks = None
+    # Optionally filter to the active task list (task group or explicit selected_tasks)
+    group_tasks = get_tasks_for_scoring_filter(config)
 
     if group_tasks is not None:
         before = len(rows)
         rows = [r for r in rows if r.get("legalbench_task", "") in group_tasks]
         if len(rows) < before:
-            print(f"  Filtered to task group '{group}': {len(rows)}/{before} rows.")
+            print(f"  Filtered to configured tasks ({len(group_tasks)} names): {len(rows)}/{before} rows.")
 
     scored: list[dict] = []
     for r in rows:

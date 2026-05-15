@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Fact-check triplets by comparing Expert, Naive-Calm, and Naive-Distressed versions."""
+"""Fact-check triplets by comparing Expert, Naive-Calm, and Naive-Distressed versions.
+
+Supports --batch flag to use the Anthropic Message Batches API (50% cheaper).
+"""
 
 from __future__ import annotations
 
@@ -38,9 +41,50 @@ from utils import (
 )
 
 
+def _process_fact_check_result(row: dict, text: str, usage: dict, is_learned_hands_auto: bool) -> dict:
+    """Parse fact-check response and populate output fields."""
+    parsed, raw = safe_parse_json(text)
+    row["fact_check_raw_response"] = raw
+    row["fact_check_usage"] = usage
+
+    if parsed is not None:
+        if is_learned_hands_auto:
+            parsed["naive_calm_added_legal_facts"] = []
+            parsed["naive_calm_removed_legal_facts"] = []
+            parsed["naive_calm_changed_legal_facts"] = []
+        row["fact_check_result"] = parsed
+        row["fact_check_pass"] = parsed.get("overall_pass", False)
+        row["fact_check_error"] = None
+    else:
+        row["fact_check_result"] = None
+        row["fact_check_pass"] = False
+        row["fact_check_error"] = "JSON parse failed"
+
+    return row
+
+
+def _collect_failure(out_row: dict) -> dict | None:
+    if out_row["fact_check_pass"]:
+        return None
+    concerns = ""
+    if out_row.get("fact_check_result") and isinstance(out_row["fact_check_result"], dict):
+        concerns = "; ".join(out_row["fact_check_result"].get("concerns", []))
+    return {
+        "item_id": out_row["item_id"],
+        "legalbench_task": out_row.get("legalbench_task", ""),
+        "domain": out_row.get("domain", ""),
+        "expert_prompt": out_row.get("expert_prompt", ""),
+        "naive_calm_prompt": out_row.get("naive_calm_prompt", ""),
+        "naive_distressed_prompt": out_row.get("naive_distressed_prompt", ""),
+        "concerns": concerns,
+        "fact_check_raw_response": out_row.get("fact_check_raw_response", ""),
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Fact-check triplets.")
     add_common_args(parser)
+    parser.add_argument("--batch", action="store_true", help="Use Anthropic Batch API (50%% cheaper, async)")
     args = parser.parse_args()
 
     config = load_config(args.config)
@@ -60,6 +104,7 @@ def main() -> None:
     print(f"  Temperature: {temperature}")
     print(f"  Max tokens:  {max_tokens}")
     print(f"  Input:       {input_path}")
+    print(f"  Batch mode:  {args.batch}")
 
     if not input_path.exists():
         print(f"ERROR: Input file not found: {input_path}")
@@ -69,7 +114,6 @@ def main() -> None:
     input_rows = read_jsonl(input_path)
     print(f"  Input rows:  {len(input_rows)}")
 
-    # Skip incomplete triplets
     valid_rows = [
         r for r in input_rows
         if r.get("expert_prompt") and r.get("naive_calm_prompt") and r.get("naive_distressed_prompt")
@@ -91,13 +135,29 @@ def main() -> None:
     template = load_prompt_template("prompts/fact_check_triplet.txt")
     meta = run_metadata(config)
     limit = get_limit(config)
-    processed = 0
-    failure_records: list[dict] = []
 
     pending = [r for r in valid_rows if r["item_id"] not in done_ids]
     if limit is not None:
         pending = pending[:limit]
 
+    if args.batch:
+        _run_batch(pending, template, meta, model, temperature, max_tokens, output_path, failures_path)
+    else:
+        _run_sequential(pending, template, meta, model, temperature, max_tokens, output_path, failures_path)
+
+
+def _run_sequential(
+    pending: list[dict],
+    template: str,
+    meta: dict,
+    model: str,
+    temperature: float,
+    max_tokens: int,
+    output_path: Path,
+    failures_path: Path,
+) -> None:
+    processed = 0
+    failure_records: list[dict] = []
     auto_passed_learned_hands = 0
 
     for row in tqdm(pending, desc="Fact-checking triplets"):
@@ -107,94 +167,114 @@ def main() -> None:
         out_row["fact_check_model"] = model
         out_row["fact_check_temperature"] = temperature
 
-        if is_learned_hands(task_name) and row.get("naive_calm_is_original"):
-            # Expert == Naive-Calm for learned_hands; only distressed was generated.
-            # Auto-pass the naive-calm side; still fact-check distressed vs original.
-            filled = template.format(
-                expert_prompt=row["expert_prompt"],
-                naive_calm_prompt=row["naive_calm_prompt"],
-                naive_distressed_prompt=row["naive_distressed_prompt"],
-                ground_truth=row["ground_truth"],
-            )
-            try:
-                text, usage = call_claude(filled, model=model, temperature=temperature, max_tokens=max_tokens)
-                parsed, raw = safe_parse_json(text)
-                out_row["fact_check_raw_response"] = raw
-                out_row["fact_check_usage"] = usage
+        is_lh_auto = is_learned_hands(task_name) and row.get("naive_calm_is_original")
+        filled = template.format(
+            expert_prompt=row["expert_prompt"],
+            naive_calm_prompt=row["naive_calm_prompt"],
+            naive_distressed_prompt=row["naive_distressed_prompt"],
+            ground_truth=row["ground_truth"],
+        )
+        out_row["fact_check_learned_hands_auto_calm"] = bool(is_lh_auto)
 
-                if parsed is not None:
-                    # Override naive-calm fields since they're identical to expert
-                    parsed["naive_calm_added_legal_facts"] = []
-                    parsed["naive_calm_removed_legal_facts"] = []
-                    parsed["naive_calm_changed_legal_facts"] = []
-                    out_row["fact_check_result"] = parsed
-                    out_row["fact_check_pass"] = parsed.get("overall_pass", False)
-                    out_row["fact_check_error"] = None
-                else:
-                    out_row["fact_check_result"] = None
-                    out_row["fact_check_pass"] = False
-                    out_row["fact_check_error"] = "JSON parse failed"
-            except Exception as e:
-                out_row["fact_check_raw_response"] = None
-                out_row["fact_check_result"] = None
-                out_row["fact_check_pass"] = False
-                out_row["fact_check_error"] = str(e)
-                out_row["fact_check_usage"] = None
-                print(f"  ERROR on {row['item_id']}: {e}")
+        try:
+            text, usage = call_claude(filled, model=model, temperature=temperature, max_tokens=max_tokens)
+            _process_fact_check_result(out_row, text, usage, is_lh_auto)
+        except Exception as e:
+            out_row["fact_check_raw_response"] = None
+            out_row["fact_check_result"] = None
+            out_row["fact_check_pass"] = False
+            out_row["fact_check_error"] = str(e)
+            out_row["fact_check_usage"] = None
+            print(f"  ERROR on {row['item_id']}: {e}")
 
-            out_row["fact_check_learned_hands_auto_calm"] = True
+        if is_lh_auto:
             auto_passed_learned_hands += 1
-        else:
-            filled = template.format(
-                expert_prompt=row["expert_prompt"],
-                naive_calm_prompt=row["naive_calm_prompt"],
-                naive_distressed_prompt=row["naive_distressed_prompt"],
-                ground_truth=row["ground_truth"],
-            )
 
-            out_row["fact_check_learned_hands_auto_calm"] = False
-
-            try:
-                text, usage = call_claude(filled, model=model, temperature=temperature, max_tokens=max_tokens)
-                parsed, raw = safe_parse_json(text)
-                out_row["fact_check_raw_response"] = raw
-                out_row["fact_check_usage"] = usage
-
-                if parsed is not None:
-                    out_row["fact_check_result"] = parsed
-                    out_row["fact_check_pass"] = parsed.get("overall_pass", False)
-                    out_row["fact_check_error"] = None
-                else:
-                    out_row["fact_check_result"] = None
-                    out_row["fact_check_pass"] = False
-                    out_row["fact_check_error"] = "JSON parse failed"
-            except Exception as e:
-                out_row["fact_check_raw_response"] = None
-                out_row["fact_check_result"] = None
-                out_row["fact_check_pass"] = False
-                out_row["fact_check_error"] = str(e)
-                out_row["fact_check_usage"] = None
-                print(f"  ERROR on {row['item_id']}: {e}")
-
-        if not out_row["fact_check_pass"]:
-            concerns = ""
-            if out_row.get("fact_check_result") and isinstance(out_row["fact_check_result"], dict):
-                concerns = "; ".join(out_row["fact_check_result"].get("concerns", []))
-            failure_records.append({
-                "item_id": out_row["item_id"],
-                "legalbench_task": out_row.get("legalbench_task", ""),
-                "domain": out_row.get("domain", ""),
-                "expert_prompt": out_row.get("expert_prompt", ""),
-                "naive_calm_prompt": out_row.get("naive_calm_prompt", ""),
-                "naive_distressed_prompt": out_row.get("naive_distressed_prompt", ""),
-                "concerns": concerns,
-                "fact_check_raw_response": out_row.get("fact_check_raw_response", ""),
-            })
+        failure = _collect_failure(out_row)
+        if failure:
+            failure_records.append(failure)
 
         append_jsonl(output_path, out_row)
         processed += 1
 
-    # Write failure CSV
+    _write_summary(output_path, failures_path, failure_records, processed, auto_passed_learned_hands)
+
+
+def _run_batch(
+    pending: list[dict],
+    template: str,
+    meta: dict,
+    model: str,
+    temperature: float,
+    max_tokens: int,
+    output_path: Path,
+    failures_path: Path,
+) -> None:
+    from batch_utils import BatchRequest, run_batch_and_wait
+
+    batch_requests = []
+    for row in pending:
+        filled = template.format(
+            expert_prompt=row["expert_prompt"],
+            naive_calm_prompt=row["naive_calm_prompt"],
+            naive_distressed_prompt=row["naive_distressed_prompt"],
+            ground_truth=row["ground_truth"],
+        )
+        batch_requests.append(BatchRequest(
+            custom_id=row["item_id"],
+            prompt=filled,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        ))
+
+    results = run_batch_and_wait(batch_requests, script_name="05_fact_check")
+
+    results_map = {r.custom_id: r for r in results}
+    failure_records: list[dict] = []
+    auto_passed_learned_hands = 0
+
+    for row in pending:
+        task_name = row.get("legalbench_task", "")
+        out_row = dict(row)
+        out_row.update(meta)
+        out_row["fact_check_model"] = model
+        out_row["fact_check_temperature"] = temperature
+
+        is_lh_auto = is_learned_hands(task_name) and row.get("naive_calm_is_original")
+        out_row["fact_check_learned_hands_auto_calm"] = bool(is_lh_auto)
+
+        result = results_map.get(row["item_id"])
+        if result and result.success:
+            _process_fact_check_result(out_row, result.text, result.usage, is_lh_auto)
+        else:
+            error_msg = result.error if result else "No result returned from batch"
+            out_row["fact_check_raw_response"] = None
+            out_row["fact_check_result"] = None
+            out_row["fact_check_pass"] = False
+            out_row["fact_check_error"] = error_msg
+            out_row["fact_check_usage"] = None
+            print(f"  ERROR on {row['item_id']}: {error_msg}")
+
+        if is_lh_auto:
+            auto_passed_learned_hands += 1
+
+        failure = _collect_failure(out_row)
+        if failure:
+            failure_records.append(failure)
+
+        append_jsonl(output_path, out_row)
+
+    _write_summary(output_path, failures_path, failure_records, len(pending), auto_passed_learned_hands)
+
+
+def _write_summary(
+    output_path: Path,
+    failures_path: Path,
+    failure_records: list[dict],
+    processed: int,
+    auto_passed_learned_hands: int,
+) -> None:
     if failure_records:
         ensure_dirs(failures_path.parent)
         pd.DataFrame(failure_records).to_csv(failures_path, index=False)

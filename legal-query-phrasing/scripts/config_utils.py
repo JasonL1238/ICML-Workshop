@@ -137,12 +137,17 @@ def get_selected_tasks(config: dict) -> list[str]:
 
     Resolution order:
       1. Explicit --selected-tasks on CLI  →  use those verbatim
-      2. --task-group (or config run.task_group)  →  resolve via task_inventory
-      3. Legacy full-mode use_all_tasks  →  empty list (caller uses inventory)
-      4. data.selected_tasks from config.yaml
+      2. run.use_selected_tasks_only + non-empty data.selected_tasks  →  YAML list only
+      3. --task-group (or config run.task_group)  →  resolve via task_inventory
+      4. Legacy full-mode use_all_tasks  →  empty list (caller uses inventory)
+      5. data.selected_tasks from config.yaml (fallback)
     """
     if config.get("_explicit_selected_tasks"):
         return list(config["data"].get("selected_tasks", []))
+
+    yaml_tasks = list(config["data"].get("selected_tasks") or [])
+    if config.get("run", {}).get("use_selected_tasks_only", False) and yaml_tasks:
+        return yaml_tasks
 
     from task_inventory import get_tasks_for_group
 
@@ -156,6 +161,28 @@ def get_selected_tasks(config: dict) -> list[str]:
     if limits["mode"] == "full" and limits["use_all_tasks"]:
         return []
     return list(config["data"].get("selected_tasks", []))
+
+
+def get_tasks_for_scoring_filter(config: dict) -> set[str] | None:
+    """Tasks to retain when scoring (09) or analyzing (12) primary LegalBench-exact rows.
+
+    Returns None if the file should not be filtered by task name.
+    """
+    if config.get("_explicit_selected_tasks"):
+        tasks = list(config["data"].get("selected_tasks") or [])
+        return set(tasks) if tasks else None
+
+    if config.get("run", {}).get("use_selected_tasks_only", False):
+        tasks = list(config["data"].get("selected_tasks") or [])
+        return set(tasks) if tasks else None
+
+    from task_inventory import get_tasks_for_group
+
+    group = get_task_group(config)
+    try:
+        return set(get_tasks_for_group(group))
+    except ValueError:
+        return None
 
 
 def should_resume(config: dict) -> bool:
@@ -188,8 +215,13 @@ def print_run_header(config: dict, output_path: Path | str) -> None:
     print("=" * 60)
     print(f"  Run mode:           {limits['mode']}")
     print(f"  Task group:         {group}")
+    if config.get("run", {}).get("use_selected_tasks_only"):
+        print("  Task source:        config.yaml (use_selected_tasks_only; ignores task_group inventory)")
     print(f"  Eval split:         {eval_split}")
     print(f"  Selected tasks:     {len(tasks)} task(s)")
+    if config.get("run", {}).get("use_selected_tasks_only") and tasks:
+        for t in tasks:
+            print(f"    • {t}")
     print(f"  Max tasks:          {limits['max_tasks']}")
     print(f"  Max rows per task:  {limits['max_rows_per_task']}")
     print(f"  Max total rows:     {limits['max_total_rows']}")

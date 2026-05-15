@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import anthropic
+import openai
 from dotenv import load_dotenv
 from tenacity import (
     retry,
@@ -33,10 +34,23 @@ def load_env() -> dict[str, str]:
         raise RuntimeError(
             "ANTHROPIC_API_KEY is not set. Copy .env.example to .env and add your key."
         )
-    return {
+    env = {
         "ANTHROPIC_API_KEY": api_key,
         "ANTHROPIC_MODEL": os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6"),
     }
+    openai_key = os.environ.get("OPENAI_API_KEY", "")
+    if openai_key and openai_key != "your_openai_api_key_here":
+        env["OPENAI_API_KEY"] = openai_key
+    env["OPENAI_MODEL"] = os.environ.get("OPENAI_MODEL", "gpt-5.4")
+    return env
+
+
+def require_openai_key(env: dict[str, str]) -> None:
+    """Raise if OPENAI_API_KEY was not loaded."""
+    if "OPENAI_API_KEY" not in env:
+        raise RuntimeError(
+            "OPENAI_API_KEY is not set. Add it to .env (see .env.example)."
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -170,6 +184,48 @@ def call_claude(
     usage = {
         "input_tokens": message.usage.input_tokens,
         "output_tokens": message.usage.output_tokens,
+    }
+    return text, usage
+
+
+# ---------------------------------------------------------------------------
+# OpenAI helpers
+# ---------------------------------------------------------------------------
+
+_OPENAI_RETRYABLE = (
+    openai.APIConnectionError,
+    openai.RateLimitError,
+    openai.InternalServerError,
+)
+
+
+@retry(
+    retry=retry_if_exception_type(_OPENAI_RETRYABLE),
+    wait=wait_exponential(multiplier=2, min=4, max=120),
+    stop=stop_after_attempt(6),
+    reraise=True,
+)
+def call_openai(
+    prompt: str,
+    model: str = "gpt-5.4",
+    temperature: float = 0.0,
+    max_tokens: int = 700,
+) -> tuple[str, dict]:
+    """Call OpenAI chat completion and return (text_output, usage_dict).
+
+    Uses OPENAI_API_KEY from environment. Retries on transient errors.
+    """
+    client = openai.OpenAI()
+    response = client.chat.completions.create(
+        model=model,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    text = response.choices[0].message.content or ""
+    usage = {
+        "input_tokens": response.usage.prompt_tokens,
+        "output_tokens": response.usage.completion_tokens,
     }
     return text, usage
 
