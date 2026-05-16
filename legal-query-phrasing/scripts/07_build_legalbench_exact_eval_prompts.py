@@ -113,14 +113,24 @@ def main() -> None:
         try:
             text, _ = fetch_or_load_base_prompt(task)
         except Exception as e:
-            skipped_tasks.append({"legalbench_task": task, "reason": f"fetch_error: {e}"})
+            skipped_tasks.append({
+                "task_name": task,
+                "script_stage": "07_build_legalbench_exact_eval_prompts",
+                "reason": f"fetch_error: {e}",
+                "detected_columns": "",
+                "detected_placeholders": "",
+            })
             continue
 
+        placeholders = PLACEHOLDER_RE.findall(text)
         n, token = analyze_placeholders(text)
         if n != 1 or token is None:
             skipped_tasks.append({
-                "legalbench_task": task,
+                "task_name": task,
+                "script_stage": "07_build_legalbench_exact_eval_prompts",
                 "reason": f"multi_or_zero_placeholders: count={n}",
+                "detected_columns": "",
+                "detected_placeholders": "; ".join(placeholders),
             })
             continue
 

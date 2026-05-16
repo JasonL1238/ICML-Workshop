@@ -168,18 +168,22 @@ def call_claude(
     model: str = "claude-sonnet-4-6",
     temperature: float = 0.0,
     max_tokens: int = 700,
+    stop_sequences: list[str] | None = None,
 ) -> tuple[str, dict]:
     """Call Claude and return (text_output, usage_dict).
 
     Uses ANTHROPIC_API_KEY from environment. Retries on transient errors.
     """
     client = anthropic.Anthropic()  # reads ANTHROPIC_API_KEY from env
-    message = client.messages.create(
+    kwargs: dict = dict(
         model=model,
         max_tokens=max_tokens,
         temperature=temperature,
         messages=[{"role": "user", "content": prompt}],
     )
+    if stop_sequences:
+        kwargs["stop_sequences"] = stop_sequences
+    message = client.messages.create(**kwargs)
     text = extract_text_from_message(message)
     usage = {
         "input_tokens": message.usage.input_tokens,
@@ -210,18 +214,22 @@ def call_openai(
     model: str = "gpt-5.4",
     temperature: float = 0.0,
     max_tokens: int = 700,
+    stop: list[str] | None = None,
 ) -> tuple[str, dict]:
     """Call OpenAI chat completion and return (text_output, usage_dict).
 
     Uses OPENAI_API_KEY from environment. Retries on transient errors.
     """
     client = openai.OpenAI()
-    response = client.chat.completions.create(
+    kwargs: dict = dict(
         model=model,
-        max_tokens=max_tokens,
+        max_completion_tokens=max_tokens,
         temperature=temperature,
         messages=[{"role": "user", "content": prompt}],
     )
+    if stop:
+        kwargs["stop"] = stop
+    response = client.chat.completions.create(**kwargs)
     text = response.choices[0].message.content or ""
     usage = {
         "input_tokens": response.usage.prompt_tokens,

@@ -98,6 +98,7 @@ TASK_INVENTORY: list[TaskMeta] = [
     _entry("legal_reasoning_causality",         "medium", "high",   True,  "main"),
     _entry("nys_judicial_ethics",               "medium", "high",   True,  "main"),
     _entry("personal_jurisdiction",             "high",   "high",   True,  "main"),
+    _entry("proa",                             "medium", "medium", True,  "main"),
     _entry("privacy_policy_entailment",         "high",   "high",   True,  "main"),
     _entry("privacy_policy_qa",                 "high",   "high",   True,  "main"),
     _entry("rule_qa",                           "high",   "high",   True,  "main"),
@@ -129,8 +130,8 @@ TASK_INVENTORY: list[TaskMeta] = [
     _entry("jcrew_blocker",                    "low",    "low",    True,  "appendix"),
     _entry("oral_argument_question_purpose",   "medium", "medium", True,  "appendix"),
     _entry("overruling",                       "medium", "medium", True,  "appendix"),
-    _entry("proa",                             "medium", "medium", True,  "appendix"),
-    _entry("sara_entailment",                  "medium", "medium", True,  "appendix"),
+    _entry("sara_entailment",                  "medium", "medium", True,  "appendix",
+           "multi-placeholder base_prompt ({{statute}}, {{description}}, {{question}})"),
     _entry("sara_numeric",                     "medium", "medium", True,  "appendix"),
     _entry("scalr",                            "medium", "medium", True,  "appendix"),
     _entry("ssla_company_defendants",          "low",    "low",    True,  "appendix"),
@@ -241,6 +242,35 @@ TASK_INVENTORY: list[TaskMeta] = [
     _supply("supply_chain_disclosure_disclosed_training"),
     _supply("supply_chain_disclosure_disclosed_verification"),
 ]
+
+# ── Clean binary task list (all Yes/No answers, single-placeholder prompts) ──
+
+MAIN_CLEAN_BINARY: list[str] = [
+    "telemarketing_sales_rule",
+    "personal_jurisdiction",
+    "hearsay",
+    "diversity_2",
+    "diversity_6",
+    "proa",
+    "international_citizenship_questions",
+    "nys_judicial_ethics",
+]
+
+TASK_FAMILY_MAP: dict[str, str] = {
+    "telemarketing_sales_rule": "consumer_protection",
+    "personal_jurisdiction": "civil_procedure_personal_jurisdiction",
+    "hearsay": "evidence",
+    "diversity_2": "civil_procedure_diversity",
+    "diversity_6": "civil_procedure_diversity",
+    "proa": "statutory_private_rights",
+    "international_citizenship_questions": "citizenship_status",
+    "nys_judicial_ethics": "judicial_ethics",
+}
+
+
+def get_task_family(task: str) -> str:
+    """Return the legal domain family for a task."""
+    return TASK_FAMILY_MAP.get(task, "other")
 
 # ── Lookup helpers ───────────────────────────────────────────────────────
 

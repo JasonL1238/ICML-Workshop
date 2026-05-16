@@ -37,9 +37,21 @@ def legalbench_normalize(text: str) -> str:
     return s.strip()
 
 
+def extract_first_label(text: str) -> str:
+    """Extract the first word from a normalized answer string.
+
+    Handles cases like 'Yes.' / 'No,' / 'Yes, because...' / 'No\\n\\nexplanation'
+    by normalizing and taking only the first token.
+    """
+    normalized = legalbench_normalize(text)
+    if not normalized:
+        return ""
+    return normalized.split()[0]
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Score legalbench_exact_anthropic_outputs.jsonl → CSV."
+        description="Score legalbench_exact_eval_outputs.jsonl → CSV."
     )
     add_common_args(parser)
     args = parser.parse_args()
@@ -47,12 +59,12 @@ def main() -> None:
     config = load_config(args.config)
     config = merge_cli_overrides(config, args)
 
-    input_path = resolve_file(config, "legalbench_exact_anthropic_outputs")
+    input_path = resolve_file(config, "legalbench_exact_eval_outputs")
     csv_out = resolve_file(config, "legalbench_exact_scored_outputs")
 
     if not input_path.exists():
         print(f"ERROR: Input not found: {input_path}")
-        print("Run 08_run_legalbench_exact_eval_anthropic.py first.")
+        print("Run 08_run_legalbench_exact_eval.py first.")
         sys.exit(1)
 
     rows = read_jsonl(input_path)
@@ -71,7 +83,9 @@ def main() -> None:
     for r in rows:
         raw = r.get("model_raw_output")
         raw_str = raw if isinstance(raw, str) else ("" if raw is None else str(raw))
-        norm_model = legalbench_normalize(raw_str)
+        parsed = str(r.get("parsed_answer", "")) or raw_str
+
+        norm_model = extract_first_label(parsed)
         norm_truth = legalbench_normalize(str(r.get("ground_truth", "")))
         correct = bool(norm_model) and norm_model == norm_truth
 
@@ -86,7 +100,7 @@ def main() -> None:
             "condition": r.get("condition", ""),
             "ground_truth": r.get("ground_truth", ""),
             "model_raw_output": raw_str,
-            "parsed_answer": r.get("parsed_answer", ""),
+            "parsed_answer": parsed,
             "normalized_model_output": norm_model,
             "normalized_ground_truth": norm_truth,
             "correct": correct,

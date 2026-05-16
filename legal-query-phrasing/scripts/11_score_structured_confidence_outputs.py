@@ -55,7 +55,7 @@ def main() -> None:
 
     if not input_path.exists():
         print(f"ERROR: Input file not found: {input_path}")
-        print("Run 10_run_structured_confidence_eval_anthropic.py first.")
+        print("Run 10_run_structured_confidence_eval.py first.")
         sys.exit(1)
 
     rows = read_jsonl(input_path)

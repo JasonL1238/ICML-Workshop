@@ -1,15 +1,14 @@
 run:
-  mode: "full"   # options: pilot, batch, full — ICML workshop: full pipeline with 11 tasks × up to 50 rows
+  mode: "pilot"   # options: pilot, batch, full
   resume: true
   overwrite: false
   random_seed: 42
 
   # When true: use only data.selected_tasks below (order preserved).
-  # task_group is ignored for task selection; do not rely on main/appendix inventory.
   use_selected_tasks_only: true
 
   # Informational only while use_selected_tasks_only is true (for logs / metadata).
-  task_group: "explicit"
+  task_group: "main_clean_binary"
 
 data:
   dataset_name: "nguha/legalbench"
@@ -19,39 +18,40 @@ data:
   # benchmark methodology.
   eval_split: "test"
 
-  # Eleven LegalBench tasks (diversity_1 intentionally excluded). Caps below apply per task.
+  # Eight binary-answer LegalBench tasks spanning 6 legal domains.
+  # All answers are strictly Yes/No.
   selected_tasks:
     - "telemarketing_sales_rule"
-    - "ucc_v_common_law"
     - "personal_jurisdiction"
     - "hearsay"
     - "diversity_2"
+    - "diversity_6"
     - "proa"
     - "international_citizenship_questions"
-    - "successor_liability"
     - "nys_judicial_ethics"
-    - "sara_entailment"
-    - "unfair_tos"
 
-  # Pilot mode should be tiny and cheap.
+  # Pilot: 2 tasks, 5 rows each (quick sanity check).
   pilot:
-    max_tasks: 1
+    max_tasks: 2
     max_rows_per_task: 5
-    max_total_rows: 5
+    max_total_rows: 10
+    sampling_strategy: "per_task_cap"
 
-  # Batch mode should be bigger but still limited.
+  # Batch: all 8 tasks, 50 rows each.
   batch:
-    max_tasks: 5
-    max_rows_per_task: 20
-    max_total_rows: 100
-
-  # Full mode: all 11 tasks, up to 50 test rows each (first rows in split order after filters).
-  # max_total_rows null = no cross-task early stop (all tasks get their own cap).
-  full:
-    use_all_tasks: false
-    max_tasks: null
+    max_tasks: 8
     max_rows_per_task: 50
+    max_total_rows: 400
+    sampling_strategy: "per_task_cap"
+
+  # Full: all 8 tasks, up to 300 rows per task, no global cap.
+  # Each base situation produces 3 conditions → up to 7200 eval prompts.
+  # Actual total is lower because some tasks have <300 usable rows.
+  full:
+    max_tasks: 8
+    max_rows_per_task: 300
     max_total_rows: null
+    sampling_strategy: "per_task_cap"
 
 generation:
   provider: "anthropic"
@@ -69,7 +69,8 @@ evaluation:
   temperature: 0.0
   max_tokens: 700
   # Short completions for LegalBench-style exact prompts (script 08).
-  legalbench_exact_max_tokens: 50
+  # With stop_sequences=["\n"], output is typically 1-2 tokens.
+  legalbench_exact_max_tokens: 10
 
 files:
   expert_candidates: "data/processed/expert_candidates.jsonl"
@@ -81,5 +82,5 @@ files:
   model_eval_prompts: "data/eval/model_eval_prompts.jsonl"
   eval_outputs: "data/eval/anthropic_eval_outputs.jsonl"
   legalbench_exact_eval_prompts: "data/eval/legalbench_exact_eval_prompts.jsonl"
-  legalbench_exact_anthropic_outputs: "data/eval/legalbench_exact_anthropic_outputs.jsonl"
+  legalbench_exact_eval_outputs: "data/eval/legalbench_exact_eval_outputs.jsonl"
   legalbench_exact_scored_outputs: "data/eval/legalbench_exact_scored_outputs.csv"

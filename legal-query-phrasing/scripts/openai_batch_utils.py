@@ -31,6 +31,7 @@ class BatchRequest:
     model: str = "gpt-5.4"
     temperature: float = 0.0
     max_tokens: int = 700
+    stop: list[str] | None = None
 
 
 @dataclass
@@ -81,16 +82,19 @@ class BatchJob:
 
 def _build_request_line(req: BatchRequest) -> dict:
     """Build a single JSONL line for the OpenAI Batch API input file."""
+    body: dict = {
+        "model": req.model,
+        "temperature": req.temperature,
+        "max_completion_tokens": req.max_tokens,
+        "messages": [{"role": "user", "content": req.prompt}],
+    }
+    if req.stop:
+        body["stop"] = req.stop
     return {
         "custom_id": req.custom_id,
         "method": "POST",
         "url": "/v1/chat/completions",
-        "body": {
-            "model": req.model,
-            "temperature": req.temperature,
-            "max_tokens": req.max_tokens,
-            "messages": [{"role": "user", "content": req.prompt}],
-        },
+        "body": body,
     }
 
 

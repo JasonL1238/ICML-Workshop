@@ -13,10 +13,10 @@ Question:
 
 Return valid JSON only with this schema:
 
-{
+{{
   "answer": "",
   "confidence": 0.0,
   "main_legal_issue": "",
   "uncertainty_reason": "",
   "brief_reasoning": ""
-}
+}}

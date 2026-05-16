@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
-"""Run Claude on LegalBench-exact prompts (single user message, short completion).
+"""Run GPT-5.4 on LegalBench-exact prompts (single user message, short completion).
 
-Supports --batch flag to use the Anthropic Message Batches API (50% cheaper).
+The few-shot pattern in base_prompt.txt teaches the model to output the answer
+first (Yes/No), followed by optional explanation. Script 09's extract_first_label()
+extracts just the first word for scoring.
+
+Supports --batch flag to use the OpenAI Batch API (50% cheaper).
 """
 
 from __future__ import annotations
@@ -25,7 +29,9 @@ from config_utils import (
     should_overwrite,
     should_resume,
 )
-from utils import append_jsonl, call_claude, load_env, read_jsonl
+from utils import append_jsonl, call_openai, load_env, read_jsonl, require_openai_key
+
+EVAL_STOP_SEQUENCES: list[str] | None = None
 
 
 def parsed_answer_from_raw(raw: str | None) -> str:
@@ -37,27 +43,29 @@ def parsed_answer_from_raw(raw: str | None) -> str:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Run Anthropic model on legalbench_exact_eval_prompts.jsonl."
+        description="Run OpenAI model on legalbench_exact_eval_prompts.jsonl."
     )
     add_common_args(parser)
-    parser.add_argument("--batch", action="store_true", help="Use Anthropic Batch API (50%% cheaper, async)")
+    parser.add_argument("--batch", action="store_true", help="Use OpenAI Batch API (50%% cheaper, async)")
     args = parser.parse_args()
 
     config = load_config(args.config)
     config = merge_cli_overrides(config, args)
 
     env = load_env()
-    model = env.get("ANTHROPIC_MODEL") or config["evaluation"]["model"]
+    require_openai_key(env)
+    model = env.get("OPENAI_MODEL") or config["evaluation"]["model"]
     temperature = 0.0
-    max_tokens = int(config["evaluation"].get("legalbench_exact_max_tokens", 50))
+    max_tokens = int(config["evaluation"].get("legalbench_exact_max_tokens", 10))
 
     input_path = resolve_file(config, "legalbench_exact_eval_prompts")
-    output_path = resolve_file(config, "legalbench_exact_anthropic_outputs")
+    output_path = resolve_file(config, "legalbench_exact_eval_outputs")
 
     print_run_header(config, output_path)
     print(f"  Model:       {model}")
     print(f"  Temperature: {temperature}")
     print(f"  Max tokens:  {max_tokens}")
+    print(f"  Stop seqs:   {EVAL_STOP_SEQUENCES}")
     print(f"  Input:       {input_path}")
     print(f"  Batch mode:  {args.batch}")
 
@@ -124,11 +132,12 @@ def _run_sequential(
             "temperature": temperature,
         }
         try:
-            text, usage = call_claude(
+            text, usage = call_openai(
                 row["final_prompt"],
                 model=model,
                 temperature=temperature,
                 max_tokens=max_tokens,
+                stop=EVAL_STOP_SEQUENCES,
             )
             out_row["model_raw_output"] = text
             out_row["parsed_answer"] = parsed_answer_from_raw(text)
@@ -156,7 +165,7 @@ def _run_batch(
     max_tokens: int,
     output_path: Path,
 ) -> None:
-    from batch_utils import BatchRequest, run_batch_and_wait
+    from openai_batch_utils import BatchRequest, run_openai_batch_and_wait
 
     batch_requests = []
     for row in pending:
@@ -166,9 +175,10 @@ def _run_batch(
             model=model,
             temperature=temperature,
             max_tokens=max_tokens,
+            stop=EVAL_STOP_SEQUENCES,
         ))
 
-    results = run_batch_and_wait(batch_requests, script_name="08_legalbench_exact")
+    results = run_openai_batch_and_wait(batch_requests, script_name="08_legalbench_exact")
 
     results_map = {r.custom_id: r for r in results}
 

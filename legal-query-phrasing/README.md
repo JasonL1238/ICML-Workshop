@@ -39,28 +39,37 @@ This means:
 
 ## Task Selection Methodology
 
-**This study does not test all 162 LegalBench tasks as the main result.** Many LegalBench subsets (e.g. CUAD contract extraction, MAUD merger-agreement analysis, supply-chain corporate disclosures) are not general-population legal-help scenarios — they test specialized practitioner tasks that ordinary people would never encounter in an access-to-justice context.
+**This study does not test all 162 LegalBench tasks.** Many LegalBench subsets (e.g. CUAD contract extraction, MAUD merger-agreement analysis, supply-chain corporate disclosures) are specialized practitioner tasks irrelevant to access-to-justice users.
 
-The **main experiment** uses a principled A2J-relevant subset of 37 tasks, selected with these criteria:
+The **main experiment** uses **8 clean binary-answer tasks** spanning 6 legal domains. All tasks have strictly Yes/No answers, single-placeholder prompt templates, and are scoreable via exact match:
 
-- **Scenario-based or legal-question-based** — the input presents a situation a real person might face
-- **Relevant to ordinary people** — housing, employment, family, consumer, benefits, criminal, etc.
-- **Automatically scoreable** — classification or short-answer tasks with exact-match evaluation
-- **Naturally rewriteable** — the expert text can be meaningfully simplified into layperson language
-- **Not long-document extraction** — excludes CUAD (38 tasks), MAUD (34 tasks), and supply-chain disclosure (10 tasks)
-- **Not corporate/securities-heavy** — excludes tasks centered on corporate governance
+| Task | Legal Domain | Answer Type |
+|------|-------------|-------------|
+| `telemarketing_sales_rule` | Consumer Protection | Yes/No |
+| `personal_jurisdiction` | Civil Procedure (Personal Jurisdiction) | Yes/No |
+| `hearsay` | Evidence | Yes/No |
+| `diversity_2` | Civil Procedure (Diversity) | Yes/No |
+| `diversity_6` | Civil Procedure (Diversity) | Yes/No |
+| `proa` | Statutory Private Rights | Yes/No |
+| `international_citizenship_questions` | Citizenship/Status | Yes/No |
+| `nys_judicial_ethics` | Judicial Ethics | Yes/No |
 
-An additional 40 **appendix** tasks are available as robustness checks. These are scoreable but are less central to the A2J framing (contract NLI, privacy policy classification, statutory interpretation tools, etc.).
+Selection criteria:
+- **Binary answers only** — ensures `stop_sequences=["\n"]` reliably captures the full answer
+- **Single-placeholder prompts** — compatible with the few-shot template substitution in Script 07
+- **A2J-relevant** — scenario-based legal questions an ordinary person might face
+- **Automatically scoreable** — exact match after normalization
 
 The full task classification is in `scripts/task_inventory.py`, which labels every LegalBench task with `a2j_relevance`, `rewrite_suitability`, `auto_scoreable`, `recommended_split`, and `exclusion_reason`.
 
-### Task Groups
+### Scale
 
-| Flag | Tasks | Use |
-|------|-------|-----|
-| `--task-group main` (default) | 37 | Primary A2J-relevant experiment |
-| `--task-group appendix` | 40 | Robustness checks |
-| `--task-group all-filtered` | 77 | Main + appendix combined |
+- **8 tasks**, up to **300 rows per task** (per-task cap, no global total limit)
+- Each base situation produces **3 conditions** (Expert, Naive-Calm, Naive-Distressed)
+- Up to **2,400 base situations** (theoretical max; actual total is lower because some tasks have fewer than 300 usable rows)
+- Up to **7,200 evaluation prompts** per model
+
+The full run uses a per-task cap of 300 rows. This prevents very large tasks from dominating while still allowing medium and large tasks to contribute more examples than the pilot/batch runs. Small tasks (e.g. `telemarketing_sales_rule` ~52 rows, `personal_jurisdiction` ~50 rows) contribute all available usable rows. No unused quota is redistributed between tasks.
 
 ### Evaluation Methodology
 
@@ -70,8 +79,9 @@ The primary evaluation imitates LegalBench as closely as possible:
 2. **Original prompts** — loads each task's `base_prompt.txt` from the [HazyResearch/legalbench](https://github.com/HazyResearch/legalbench) GitHub repo
 3. **Placeholder substitution** — replaces the original `{{text}}` (or similar) placeholder with Expert / Naive-Calm / Naive-Distressed text
 4. **No extra instructions** — no JSON wrappers, no evaluation instructions added to the main accuracy run
-5. **LegalBench-style scoring** — lowercase, strip punctuation, exact match
-6. **Structured confidence evaluation** is a separate secondary analysis only (scripts 10–11)
+5. **`stop_sequences=["\n"]`** — forces the model to output only the answer token (Yes/No) without explanations, matching the few-shot pattern
+6. **LegalBench-style scoring** — lowercase, strip punctuation, extract first word, exact match
+7. **Structured confidence evaluation** is a separate secondary analysis only (scripts 10–11)
 
 ## Setup
 
@@ -109,7 +119,7 @@ You should see `API OK` in the response if everything is configured correctly.
 
 Run each script from the project root (`legal-query-phrasing/`).
 
-All scripts accept `--task-group main` (default), `--task-group appendix`, or `--task-group all-filtered`.
+The default mode is `pilot` (8 tasks, 10 rows each). Change `config.yaml` `run.mode` to `"full"` for the production run.
 
 ```bash
 # Step 0: Verify API access
@@ -118,27 +128,27 @@ python scripts/00_smoke_test_anthropic.py
 # Step 1: Inventory all LegalBench tasks
 python scripts/01_inventory_legalbench.py
 
-# Step 2: Select candidate expert items (default: main A2J subset, test split)
+# Step 2: Select candidate expert items
 python scripts/02_select_candidate_items.py
 
 # Step 3: Generate Naive-Calm rewrites
-python scripts/03_generate_naive_calm.py
+python scripts/03_generate_naive_calm.py --batch
 
 # Step 4: Generate Naive-Distressed rewrites (from Naive-Calm)
-python scripts/04_generate_naive_distressed.py
+python scripts/04_generate_naive_distressed.py --batch
 
 # Step 5: Fact-check all triplets
-python scripts/05_fact_check_triplets.py
+python scripts/05_fact_check_triplets.py --batch
 
 # Step 6: Export final dataset and eval prompts
 python scripts/06_export_final_dataset.py
 
-# --- Primary accuracy (LegalBench-faithful prompts; no JSON wrapper) ---
+# --- Primary accuracy (LegalBench-faithful prompts; stop_sequences for clean output) ---
 # Step 7: Build prompts from HazyResearch/legalbench base_prompt.txt templates
 python scripts/07_build_legalbench_exact_eval_prompts.py
 
-# Step 8: Run Claude on exact LegalBench-style prompts
-python scripts/08_run_legalbench_exact_eval_anthropic.py
+# Step 8: Run Claude on exact LegalBench-style prompts (use --overwrite to regenerate)
+python scripts/08_run_legalbench_exact_eval_anthropic.py --overwrite --batch
 
 # Step 9: Score primary outputs → CSV + printed accuracy / paired drops
 python scripts/09_score_legalbench_exact_outputs.py
@@ -156,75 +166,43 @@ python scripts/11_score_structured_confidence_outputs.py
 
 ## Pilot vs Batch vs Full Runs
 
-All pipeline scripts read `config.yaml` for default settings and accept CLI overrides. You control scale via the `--mode` flag and `config.yaml`.
+All pipeline scripts read `config.yaml` for default settings and accept CLI overrides.
 
 ### Configuration
 
 Edit `config.yaml` to set:
-- `run.task_group` -- which task group to use (`main`, `appendix`, `all-filtered`); default `main`
-- `data.eval_split` -- which dataset split to use (`test` by default, per LegalBench methodology)
-- `data.selected_tasks` -- manual override for specific tasks (bypasses task group)
-- `data.pilot` / `data.batch` / `data.full` -- limits for each mode
-- `generation.model` / `evaluation.model` -- which Claude model to use
+- `run.mode` -- `pilot` (2 tasks × 5 rows), `batch` (8 × 50), or `full` (8 × 300 per-task cap)
+- `data.eval_split` -- dataset split (`test` by default, per LegalBench methodology)
+- `data.selected_tasks` -- the 8 binary-answer tasks (controlled via `use_selected_tasks_only: true`)
+- `generation.model` -- Claude model for generation
+- `evaluation.model` -- OpenAI model for primary evaluation
 
-CLI flags `--task-group`, `--selected-tasks`, `--max-total-rows`, `--max-rows-per-task` override `config.yaml`.
+### Pilot (recommended first run — default)
 
-### Tiny Pilot (recommended first run)
-
-```bash
-python scripts/02_select_candidate_items.py --mode pilot
-python scripts/03_generate_naive_calm.py --limit 5
-python scripts/04_generate_naive_distressed.py --limit 5
-python scripts/05_fact_check_triplets.py --limit 5
-python scripts/06_export_final_dataset.py
-```
-
-### Medium Batch
+2 tasks, 5 rows each (10 base items, 30 eval prompts). With `resume: true`, existing rows are kept and only new rows trigger API calls.
 
 ```bash
-python scripts/02_select_candidate_items.py --mode batch
-python scripts/03_generate_naive_calm.py
-python scripts/04_generate_naive_distressed.py
-python scripts/05_fact_check_triplets.py
+python scripts/02_select_candidate_items.py
+python scripts/03_generate_naive_calm.py --batch
+python scripts/04_generate_naive_distressed.py --batch
+python scripts/05_fact_check_triplets.py --batch
 python scripts/06_export_final_dataset.py
+python scripts/07_build_legalbench_exact_eval_prompts.py
+python scripts/08_run_legalbench_exact_eval_anthropic.py --overwrite --batch
+python scripts/09_score_legalbench_exact_outputs.py
+python scripts/12_analyze_results.py
 ```
 
 ### Full Run
 
-```bash
-python scripts/02_select_candidate_items.py --mode full
-python scripts/03_generate_naive_calm.py --mode full
-python scripts/04_generate_naive_distressed.py --mode full
-python scripts/05_fact_check_triplets.py --mode full
-python scripts/06_export_final_dataset.py
-```
+Change `config.yaml` `run.mode` from `"pilot"` to `"full"`, then run the same commands. Scripts 02-06 resume and only generate new rows up to the full limits (8 tasks × up to 300 rows per task, no global cap). Script 08 should use `--overwrite` to regenerate all eval outputs cleanly.
 
-### Full Evaluation (primary, main A2J subset)
+### Structured confidence evaluation (secondary, optional)
 
 ```bash
-python scripts/07_build_legalbench_exact_eval_prompts.py --mode full --task-group main
-python scripts/08_run_legalbench_exact_eval_anthropic.py --mode full
-python scripts/09_score_legalbench_exact_outputs.py --task-group main
-python scripts/12_analyze_results.py --task-group main
-```
-
-### Appendix robustness evaluation
-
-```bash
-python scripts/02_select_candidate_items.py --mode full --task-group appendix
-# ... run the full triplet generation pipeline ...
-python scripts/09_score_legalbench_exact_outputs.py --task-group appendix
-python scripts/12_analyze_results.py --task-group appendix
-```
-
-### Structured confidence evaluation (secondary)
-
-```bash
-python scripts/10_run_structured_confidence_eval_anthropic.py --mode full
+python scripts/10_run_structured_confidence_eval_anthropic.py
 python scripts/11_score_structured_confidence_outputs.py
 ```
-
-Use `12_analyze_results.py --scored-csv data/eval/scored_outputs.csv` if you want figures from the structured scorer instead of the LegalBench-exact CSV.
 
 ### Safety Note
 
@@ -272,7 +250,7 @@ All API scripts are resumable by default. If a run is interrupted, just re-run t
 | `data/eval/model_eval_prompts.jsonl` | Long-format prompts for secondary structured eval |
 | `data/raw/legalbench_prompts/{task}/base_prompt.txt` | Cached LegalBench `base_prompt.txt` per task |
 | `data/eval/legalbench_exact_eval_prompts.jsonl` | Primary eval: final LegalBench-style prompts |
-| `data/eval/legalbench_exact_anthropic_outputs.jsonl` | Primary raw model outputs |
+| `data/eval/legalbench_exact_eval_outputs.jsonl` | Primary raw model outputs |
 | `data/eval/legalbench_exact_scored_outputs.csv` | **Primary** scored accuracy |
 | `data/eval/skipped_multi_placeholder_tasks.csv` | Tasks skipped (not exactly one `{{...}}` placeholder) |
 | `data/eval/anthropic_eval_outputs.jsonl` | Secondary structured JSON eval outputs |

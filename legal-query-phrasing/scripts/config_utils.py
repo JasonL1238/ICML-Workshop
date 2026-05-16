@@ -109,7 +109,8 @@ def merge_cli_overrides(config: dict, args: argparse.Namespace) -> dict:
 def get_run_limits(config: dict) -> dict[str, Any]:
     """Return resolved run limits based on mode.
 
-    Returns {mode, max_tasks, max_rows_per_task, max_total_rows, use_all_tasks}.
+    Returns {mode, max_tasks, max_rows_per_task, max_total_rows, use_all_tasks,
+    sampling_strategy}.
     """
     mode = config["run"]["mode"]
     mode_cfg = config["data"].get(mode, {})
@@ -119,6 +120,7 @@ def get_run_limits(config: dict) -> dict[str, Any]:
         "max_rows_per_task": mode_cfg.get("max_rows_per_task"),
         "max_total_rows": mode_cfg.get("max_total_rows"),
         "use_all_tasks": mode_cfg.get("use_all_tasks", False),
+        "sampling_strategy": mode_cfg.get("sampling_strategy", "per_task_cap"),
     }
 
 
@@ -225,6 +227,7 @@ def print_run_header(config: dict, output_path: Path | str) -> None:
     print(f"  Max tasks:          {limits['max_tasks']}")
     print(f"  Max rows per task:  {limits['max_rows_per_task']}")
     print(f"  Max total rows:     {limits['max_total_rows']}")
+    print(f"  Sampling strategy:  {limits['sampling_strategy']}")
     print(f"  Resume:             {should_resume(config)}")
     print(f"  Overwrite:          {should_overwrite(config)}")
     print(f"  Dry run:            {is_dry_run(config)}")
@@ -246,4 +249,5 @@ def run_metadata(config: dict) -> dict:
         "selected_tasks": get_selected_tasks(config),
         "max_rows_per_task": limits["max_rows_per_task"],
         "max_total_rows": limits["max_total_rows"],
+        "sampling_strategy": limits["sampling_strategy"],
     }

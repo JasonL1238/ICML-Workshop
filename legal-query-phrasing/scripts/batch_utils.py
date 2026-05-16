@@ -30,6 +30,7 @@ class BatchRequest:
     model: str = "claude-sonnet-4-6"
     temperature: float = 0.0
     max_tokens: int = 700
+    stop_sequences: list[str] | None = None
 
 
 @dataclass
@@ -87,18 +88,22 @@ def submit_batch(
     load_env()
     client = anthropic.Anthropic()
 
-    api_requests = [
-        Request(
-            custom_id=req.custom_id,
-            params=MessageCreateParamsNonStreaming(
-                model=req.model,
-                max_tokens=req.max_tokens,
-                temperature=req.temperature,
-                messages=[{"role": "user", "content": req.prompt}],
-            ),
+    api_requests = []
+    for req in requests:
+        params: dict = dict(
+            model=req.model,
+            max_tokens=req.max_tokens,
+            temperature=req.temperature,
+            messages=[{"role": "user", "content": req.prompt}],
         )
-        for req in requests
-    ]
+        if req.stop_sequences:
+            params["stop_sequences"] = req.stop_sequences
+        api_requests.append(
+            Request(
+                custom_id=req.custom_id,
+                params=MessageCreateParamsNonStreaming(**params),
+            )
+        )
 
     message_batch = client.messages.batches.create(requests=api_requests)
 
