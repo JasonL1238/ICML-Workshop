@@ -1,0 +1,3 @@
+condition,accuracy,correct,total
+naive_calm,0.9125,73,80
+naive_distressed,0.85,68,80

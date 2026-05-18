@@ -1,9 +1,6 @@
 .env
 data/raw/
-data/processed/
-data/triplets/
-data/eval/
-results/
+data/batch_state/
 __pycache__/
 *.pyc
 .ipynb_checkpoints/

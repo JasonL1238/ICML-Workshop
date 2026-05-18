@@ -1,0 +1,4 @@
+condition,accuracy,correct,total
+expert,0.46153846153846156,30,65
+naive_calm,0.35384615384615387,23,65
+naive_distressed,0.18461538461538463,12,65
