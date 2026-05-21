@@ -38,11 +38,26 @@ from utils import PROJECT_ROOT, append_jsonl, load_env, read_jsonl, require_deep
 DEFAULT_CONCURRENCY = 20
 DEFAULT_OUTPUT_KEY = "legalbench_exact_eval_outputs_deepseek_tight"
 DEFAULT_TIGHT_OUTPUT = "data/eval/legalbench_exact_eval_outputs_deepseek_tight.jsonl"
-DEFAULT_ASSISTANT_PREFIX = "Answer: "
+DEFAULT_ASSISTANT_PREFIX = "auto"
 YES_NO_START_RE = re.compile(
     r"^[\s#*_]*(?:answer\s*[:=]\s*|a\s*[:=]\s*)?(yes|no)\b",
     re.IGNORECASE,
 )
+
+
+def _resolve_prefix(prompt: str, cli_prefix: str) -> str:
+    """Pick assistant prefix matching the prompt's few-shot answer format.
+
+    When cli_prefix is 'auto', detect whether the prompt ends with 'A:' or
+    'Answer:' and use the matching continuation so prefix-completion doesn't
+    introduce a format mismatch with the few-shot examples.
+    """
+    if cli_prefix != "auto":
+        return cli_prefix
+    stripped = prompt.rstrip()
+    if stripped.endswith("A:"):
+        return "A: "
+    return "Answer: "
 
 
 def parsed_answer_from_raw(raw: str | None) -> str:
@@ -114,6 +129,7 @@ async def _process_row(
     }
     async with sem:
         try:
+            resolved_prefix = _resolve_prefix(row["final_prompt"], assistant_prefix)
             text, usage = await _call_deepseek_async(
                 client,
                 row["final_prompt"],
@@ -123,7 +139,7 @@ async def _process_row(
                 stop,
                 disable_thinking,
                 prefix_completion,
-                assistant_prefix,
+                resolved_prefix,
             )
             out_row["model_raw_output"] = text
             out_row["parsed_answer"] = parsed_answer_from_raw(text)
@@ -305,8 +321,9 @@ def main() -> None:
         "--assistant-prefix",
         default=DEFAULT_ASSISTANT_PREFIX,
         help=(
-            "Assistant prefix for DeepSeek beta prefix-completion "
-            f"(default: {DEFAULT_ASSISTANT_PREFIX!r})."
+            "Assistant prefix for DeepSeek beta prefix-completion. "
+            "Use a single space to continue directly from the prompt's "
+            "trailing 'A:' or 'Answer:' (default: single space)."
         ),
     )
     args = parser.parse_args()
