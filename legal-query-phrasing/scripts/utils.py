@@ -42,6 +42,9 @@ def load_env() -> dict[str, str]:
     if openai_key and openai_key != "your_openai_api_key_here":
         env["OPENAI_API_KEY"] = openai_key
     env["OPENAI_MODEL"] = os.environ.get("OPENAI_MODEL", "gpt-5.4")
+    deepseek_key = os.environ.get("DEEPSEEK_API_KEY", "")
+    if deepseek_key and deepseek_key != "your_deepseek_api_key_here":
+        env["DEEPSEEK_API_KEY"] = deepseek_key
     return env
 
 
@@ -50,6 +53,14 @@ def require_openai_key(env: dict[str, str]) -> None:
     if "OPENAI_API_KEY" not in env:
         raise RuntimeError(
             "OPENAI_API_KEY is not set. Add it to .env (see .env.example)."
+        )
+
+
+def require_deepseek_key(env: dict[str, str]) -> None:
+    """Raise if DEEPSEEK_API_KEY was not loaded."""
+    if "DEEPSEEK_API_KEY" not in env:
+        raise RuntimeError(
+            "DEEPSEEK_API_KEY is not set. Add it to .env (see .env.example)."
         )
 
 
@@ -229,6 +240,53 @@ def call_openai(
     )
     if stop:
         kwargs["stop"] = stop
+    response = client.chat.completions.create(**kwargs)
+    text = response.choices[0].message.content or ""
+    usage = {
+        "input_tokens": response.usage.prompt_tokens,
+        "output_tokens": response.usage.completion_tokens,
+    }
+    return text, usage
+
+
+# ---------------------------------------------------------------------------
+# DeepSeek helpers (OpenAI-compatible API)
+# ---------------------------------------------------------------------------
+
+_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
+
+
+@retry(
+    retry=retry_if_exception_type(_OPENAI_RETRYABLE),
+    wait=wait_exponential(multiplier=2, min=4, max=120),
+    stop=stop_after_attempt(6),
+    reraise=True,
+)
+def call_deepseek(
+    prompt: str,
+    model: str = "deepseek-chat",
+    temperature: float = 0.0,
+    max_tokens: int = 700,
+    stop: list[str] | None = None,
+    disable_thinking: bool = False,
+    base_url: str = _DEEPSEEK_BASE_URL,
+) -> tuple[str, dict]:
+    """Call DeepSeek chat completion and return (text_output, usage_dict).
+
+    Uses DEEPSEEK_API_KEY from environment. DeepSeek is OpenAI-compatible.
+    """
+    api_key = os.environ.get("DEEPSEEK_API_KEY", "")
+    client = openai.OpenAI(api_key=api_key, base_url=base_url)
+    kwargs: dict = dict(
+        model=model,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    if stop:
+        kwargs["stop"] = stop
+    if disable_thinking:
+        kwargs["extra_body"] = {"thinking": {"type": "disabled"}}
     response = client.chat.completions.create(**kwargs)
     text = response.choices[0].message.content or ""
     usage = {

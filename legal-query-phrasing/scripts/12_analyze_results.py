@@ -21,11 +21,26 @@ from config_utils import (
     merge_cli_overrides,
     resolve_file,
 )
+from stats_utils import run_mcnemar_comparisons
 from task_inventory import is_learned_hands
 from utils import ensure_dirs
 
 CONDITION_ORDER = ["expert", "naive_calm", "naive_distressed"]
 CONDITION_LABELS = {"expert": "Expert", "naive_calm": "Naive-Calm", "naive_distressed": "Naive-Distressed"}
+MCNEMAR_PAIRS = [
+    ("expert", "naive_calm"),
+    ("naive_calm", "naive_distressed"),
+    ("expert", "naive_distressed"),
+]
+
+
+def results_suffix(scored_csv: Path) -> str:
+    """Derive a filename suffix from non-default scored CSV paths (e.g. _claude)."""
+    prefix = "legalbench_exact_scored_outputs"
+    stem = scored_csv.stem
+    if stem.startswith(prefix) and stem != prefix:
+        return stem[len(prefix):]
+    return ""
 
 
 def main() -> None:
@@ -51,6 +66,7 @@ def main() -> None:
     tables_dir = Path(__file__).resolve().parent.parent / "results" / "tables"
     figures_dir = Path(__file__).resolve().parent.parent / "results" / "figures"
     ensure_dirs(tables_dir, figures_dir)
+    suffix = results_suffix(input_path)
 
     if not input_path.exists():
         print(f"ERROR: Input file not found: {input_path}")
@@ -164,6 +180,21 @@ def main() -> None:
         print("\nCorrectness transitions:")
         for k, v in transitions.items():
             print(f"  {k}: {v}")
+
+    # -----------------------------------------------------------------------
+    # McNemar tests (paired condition comparisons) + FDR correction
+    # -----------------------------------------------------------------------
+    mcnemar_df = run_mcnemar_comparisons(item_pivot, MCNEMAR_PAIRS)
+    if len(mcnemar_df) > 0:
+        mcnemar_path = tables_dir / f"mcnemar_tests{suffix}.csv"
+        mcnemar_df.to_csv(mcnemar_path, index=False)
+        print("\nMcNemar tests (FDR-corrected via Benjamini-Hochberg):")
+        display_cols = [
+            "comparison", "n_paired", "b", "c", "net_flips",
+            "pvalue", "pvalue_fdr_bh", "method",
+        ]
+        print(mcnemar_df[display_cols].to_string(index=False))
+        print(f"  Saved: {mcnemar_path.name}")
 
     # -----------------------------------------------------------------------
     # Table 5: Accuracy split by task origin (learned_hands vs legalistic)

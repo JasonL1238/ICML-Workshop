@@ -1331,7 +1331,7 @@ Alex’s email is an",Yes.,yes,yes,True,gpt-5.4,0.0,"{""input_tokens"": 291, ""o
 hearsay__test__45__expert,hearsay__test__45,hearsay,evidence,expert,Yes,"Yes.
 
 The bystander’s ex",Yes.,yes,yes,True,gpt-5.4,0.0,"{""input_tokens"": 248, ""output_tokens"": 10}",
-hearsay__test__45__naive_calm,hearsay__test__45,hearsay,evidence,naive_calm,Yes,Yes—if the statement is offered,Yes—if the statement is offered,yesif,yes,False,gpt-5.4,0.0,"{""input_tokens"": 259, ""output_tokens"": 10}",
+hearsay__test__45__naive_calm,hearsay__test__45,hearsay,evidence,naive_calm,Yes,Yes—if the statement is offered,Yes—if the statement is offered,yes,yes,True,gpt-5.4,0.0,"{""input_tokens"": 259, ""output_tokens"": 10}",
 hearsay__test__45__naive_distressed,hearsay__test__45,hearsay,evidence,naive_distressed,Yes,"Yes.
 
 If the witness’s out",Yes.,yes,yes,True,gpt-5.4,0.0,"{""input_tokens"": 318, ""output_tokens"": 10}",
@@ -7958,7 +7958,7 @@ proa__test__50__naive_distressed,proa__test__50,proa,statutory_private_rights,na
 That clause does not specify",No.,no,no,True,gpt-5.4,0.0,"{""input_tokens"": 343, ""output_tokens"": 10}",
 proa__test__51__expert,proa__test__51,proa,statutory_private_rights,expert,No,"A: No
 
-The clause gives",A: No,a,no,False,gpt-5.4,0.0,"{""input_tokens"": 292, ""output_tokens"": 10}",
+The clause gives",A: No,no,no,True,gpt-5.4,0.0,"{""input_tokens"": 292, ""output_tokens"": 10}",
 proa__test__51__naive_calm,proa__test__51,proa,statutory_private_rights,naive_calm,No,No.,No.,no,no,True,gpt-5.4,0.0,"{""input_tokens"": 289, ""output_tokens"": 5}",
 proa__test__51__naive_distressed,proa__test__51,proa,statutory_private_rights,naive_distressed,No,No,No,no,no,True,gpt-5.4,0.0,"{""input_tokens"": 320, ""output_tokens"": 4}",
 proa__test__52__expert,proa__test__52,proa,statutory_private_rights,expert,No,"Yes
@@ -8116,7 +8116,7 @@ proa__test__68__naive_distressed,proa__test__68,proa,statutory_private_rights,na
 The clause describes enforcement by",No,no,no,True,gpt-5.4,0.0,"{""input_tokens"": 368, ""output_tokens"": 10}",
 proa__test__70__expert,proa__test__70,proa,statutory_private_rights,expert,No,"A: No
 
-The clause only",A: No,a,no,False,gpt-5.4,0.0,"{""input_tokens"": 297, ""output_tokens"": 10}",
+The clause only",A: No,no,no,True,gpt-5.4,0.0,"{""input_tokens"": 297, ""output_tokens"": 10}",
 proa__test__70__naive_calm,proa__test__70,proa,statutory_private_rights,naive_calm,No,"No
 
 The clause is a question",No,no,no,True,gpt-5.4,0.0,"{""input_tokens"": 295, ""output_tokens"": 10}",
@@ -8281,7 +8281,7 @@ proa__test__90__naive_distressed,proa__test__90,proa,statutory_private_rights,na
 The clause does not create",No,no,no,True,gpt-5.4,0.0,"{""input_tokens"": 343, ""output_tokens"": 10}",
 proa__test__91__expert,proa__test__91,proa,statutory_private_rights,expert,No,"A: No
 
-This clause is",A: No,a,no,False,gpt-5.4,0.0,"{""input_tokens"": 308, ""output_tokens"": 10}",
+This clause is",A: No,no,no,True,gpt-5.4,0.0,"{""input_tokens"": 308, ""output_tokens"": 10}",
 proa__test__91__naive_calm,proa__test__91,proa,statutory_private_rights,naive_calm,No,No. That clause is not a,No. That clause is not a,no,no,True,gpt-5.4,0.0,"{""input_tokens"": 299, ""output_tokens"": 10}",
 proa__test__91__naive_distressed,proa__test__91,proa,statutory_private_rights,naive_distressed,No,No,No,no,no,True,gpt-5.4,0.0,"{""input_tokens"": 347, ""output_tokens"": 4}",
 proa__test__92__expert,proa__test__92,proa,statutory_private_rights,expert,No,"No

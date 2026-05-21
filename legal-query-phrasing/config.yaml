@@ -72,6 +72,19 @@ evaluation:
   # With stop_sequences=["\n"], output is typically 1-2 tokens.
   legalbench_exact_max_tokens: 10
 
+evaluation_claude:
+  provider: "anthropic"
+  model: "claude-haiku-4-5"
+  temperature: 0.0
+  legalbench_exact_max_tokens: 10
+
+evaluation_deepseek:
+  provider: "deepseek"
+  model: "deepseek-v4-pro"
+  temperature: 0.0
+  legalbench_exact_max_tokens: 10
+  base_url: "https://api.deepseek.com"
+
 files:
   expert_candidates: "data/processed/expert_candidates.jsonl"
   with_naive_calm: "data/triplets/with_naive_calm.jsonl"
@@ -84,3 +97,9 @@ files:
   legalbench_exact_eval_prompts: "data/eval/legalbench_exact_eval_prompts.jsonl"
   legalbench_exact_eval_outputs: "data/eval/legalbench_exact_eval_outputs.jsonl"
   legalbench_exact_scored_outputs: "data/eval/legalbench_exact_scored_outputs.csv"
+  legalbench_exact_eval_outputs_claude: "data/eval/legalbench_exact_eval_outputs_claude.jsonl"
+  legalbench_exact_scored_outputs_claude: "data/eval/legalbench_exact_scored_outputs_claude.csv"
+  legalbench_exact_eval_outputs_deepseek: "data/eval/legalbench_exact_eval_outputs_deepseek.jsonl"
+  legalbench_exact_scored_outputs_deepseek: "data/eval/legalbench_exact_scored_outputs_deepseek.csv"
+  legalbench_exact_eval_outputs_deepseek_tight: "data/eval/legalbench_exact_eval_outputs_deepseek_tight.jsonl"
+  legalbench_exact_scored_outputs_deepseek_tight: "data/eval/legalbench_exact_scored_outputs_deepseek_tight.csv"

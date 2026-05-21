@@ -37,12 +37,23 @@ def legalbench_normalize(text: str) -> str:
     return s.strip()
 
 
-def extract_first_label(text: str) -> str:
-    """Extract the first word from a normalized answer string.
+_ANSWER_LINE_RE = re.compile(
+    r"^[\s#*_]*(?:answer\s*[:=]\s*|a\s*[:=]\s*)?(yes|no)\b",
+    re.IGNORECASE | re.MULTILINE,
+)
 
-    Handles cases like 'Yes.' / 'No,' / 'Yes, because...' / 'No\\n\\nexplanation'
-    by normalizing and taking only the first token.
+
+def extract_first_label(text: str) -> str:
+    """Extract the answer label (yes/no) from model output.
+
+    Handles bare 'Yes'/'No', as well as verbose patterns like
+    '# Answer: Yes', '# Yes', 'A: No', etc.
     """
+    if not text:
+        return ""
+    m = _ANSWER_LINE_RE.search(text)
+    if m:
+        return m.group(1).lower()
     normalized = legalbench_normalize(text)
     if not normalized:
         return ""
@@ -54,13 +65,15 @@ def main() -> None:
         description="Score legalbench_exact_eval_outputs.jsonl → CSV."
     )
     add_common_args(parser)
+    parser.add_argument("--input", default=None, help="Override input JSONL path (e.g. for Claude outputs)")
+    parser.add_argument("--output", default=None, help="Override output CSV path")
     args = parser.parse_args()
 
     config = load_config(args.config)
     config = merge_cli_overrides(config, args)
 
-    input_path = resolve_file(config, "legalbench_exact_eval_outputs")
-    csv_out = resolve_file(config, "legalbench_exact_scored_outputs")
+    input_path = Path(args.input) if args.input else resolve_file(config, "legalbench_exact_eval_outputs")
+    csv_out = Path(args.output) if args.output else resolve_file(config, "legalbench_exact_scored_outputs")
 
     if not input_path.exists():
         print(f"ERROR: Input not found: {input_path}")
@@ -86,6 +99,8 @@ def main() -> None:
         parsed = str(r.get("parsed_answer", "")) or raw_str
 
         norm_model = extract_first_label(parsed)
+        if norm_model not in ("yes", "no") and raw_str:
+            norm_model = extract_first_label(raw_str)
         norm_truth = legalbench_normalize(str(r.get("ground_truth", "")))
         correct = bool(norm_model) and norm_model == norm_truth
 
