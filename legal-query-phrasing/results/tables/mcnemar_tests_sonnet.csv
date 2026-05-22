@@ -1,0 +1,4 @@
+comparison,condition_a,condition_b,n_paired,a,b,c,d,discordant,net_flips,pvalue,method,pvalue_fdr_bh
+expert_vs_naive_calm,expert,naive_calm,1456,737,124,153,442,277,-29,0.09249964383016561,chi2_cc,0.09249964383016561
+naive_calm_vs_naive_distressed,naive_calm,naive_distressed,1456,784,106,230,336,336,-124,1.9435767282100664e-11,chi2_cc,2.9153650923151e-11
+expert_vs_naive_distressed,expert,naive_distressed,1456,722,139,292,303,431,-153,2.450638176643771e-13,chi2_cc,7.351914529931313e-13

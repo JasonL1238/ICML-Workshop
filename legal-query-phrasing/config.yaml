@@ -78,6 +78,12 @@ evaluation_claude:
   temperature: 0.0
   legalbench_exact_max_tokens: 10
 
+evaluation_sonnet:
+  provider: "anthropic"
+  model: "claude-sonnet-4-6"
+  temperature: 0.0
+  legalbench_exact_max_tokens: 10
+
 evaluation_deepseek:
   provider: "deepseek"
   model: "deepseek-v4-pro"
@@ -103,3 +109,5 @@ files:
   legalbench_exact_scored_outputs_deepseek: "data/eval/legalbench_exact_scored_outputs_deepseek.csv"
   legalbench_exact_eval_outputs_deepseek_tight: "data/eval/legalbench_exact_eval_outputs_deepseek_tight.jsonl"
   legalbench_exact_scored_outputs_deepseek_tight: "data/eval/legalbench_exact_scored_outputs_deepseek_tight.csv"
+  legalbench_exact_eval_outputs_sonnet: "data/eval/legalbench_exact_eval_outputs_sonnet.jsonl"
+  legalbench_exact_scored_outputs_sonnet: "data/eval/legalbench_exact_scored_outputs_sonnet.csv"

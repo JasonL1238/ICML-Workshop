@@ -1,0 +1,73 @@
+model,task,condition,accuracy
+GPT-5.4,diversity_2,Expert,0.9764309764309764
+GPT-5.4,diversity_2,Naive-Calm,0.9057239057239057
+GPT-5.4,diversity_2,Naive-Distressed,0.9494949494949495
+GPT-5.4,diversity_6,Expert,0.8982456140350877
+GPT-5.4,diversity_6,Naive-Calm,0.9122807017543859
+GPT-5.4,diversity_6,Naive-Distressed,0.8982456140350877
+GPT-5.4,hearsay,Expert,0.7553191489361702
+GPT-5.4,hearsay,Naive-Calm,0.7340425531914894
+GPT-5.4,hearsay,Naive-Distressed,0.7446808510638298
+GPT-5.4,international_citizenship_questions,Expert,0.6435643564356436
+GPT-5.4,international_citizenship_questions,Naive-Calm,0.759075907590759
+GPT-5.4,international_citizenship_questions,Naive-Distressed,0.7854785478547854
+GPT-5.4,nys_judicial_ethics,Expert,0.7577854671280276
+GPT-5.4,nys_judicial_ethics,Naive-Calm,0.7750865051903114
+GPT-5.4,nys_judicial_ethics,Naive-Distressed,0.7785467128027682
+GPT-5.4,personal_jurisdiction,Expert,0.94
+GPT-5.4,personal_jurisdiction,Naive-Calm,0.94
+GPT-5.4,personal_jurisdiction,Naive-Distressed,0.94
+GPT-5.4,proa,Expert,0.945054945054945
+GPT-5.4,proa,Naive-Calm,0.9230769230769231
+GPT-5.4,proa,Naive-Distressed,0.8461538461538461
+GPT-5.4,telemarketing_sales_rule,Expert,0.8297872340425532
+GPT-5.4,telemarketing_sales_rule,Naive-Calm,0.7659574468085106
+GPT-5.4,telemarketing_sales_rule,Naive-Distressed,0.8085106382978723
+DeepSeek,diversity_2,Expert,1.0
+DeepSeek,diversity_2,Naive-Calm,0.9427609427609428
+DeepSeek,diversity_2,Naive-Distressed,0.98989898989899
+DeepSeek,diversity_6,Expert,0.5859649122807018
+DeepSeek,diversity_6,Naive-Calm,0.5157894736842106
+DeepSeek,diversity_6,Naive-Distressed,0.624561403508772
+DeepSeek,hearsay,Expert,0.7659574468085106
+DeepSeek,hearsay,Naive-Calm,0.6914893617021277
+DeepSeek,hearsay,Naive-Distressed,0.7340425531914894
+DeepSeek,international_citizenship_questions,Expert,0.6336633663366337
+DeepSeek,international_citizenship_questions,Naive-Calm,0.7227722772277227
+DeepSeek,international_citizenship_questions,Naive-Distressed,0.759075907590759
+DeepSeek,nys_judicial_ethics,Expert,0.754325259515571
+DeepSeek,nys_judicial_ethics,Naive-Calm,0.7301038062283737
+DeepSeek,nys_judicial_ethics,Naive-Distressed,0.7508650519031141
+DeepSeek,personal_jurisdiction,Expert,0.92
+DeepSeek,personal_jurisdiction,Naive-Calm,0.92
+DeepSeek,personal_jurisdiction,Naive-Distressed,0.9
+DeepSeek,proa,Expert,0.978021978021978
+DeepSeek,proa,Naive-Calm,0.7692307692307693
+DeepSeek,proa,Naive-Distressed,0.5604395604395604
+DeepSeek,telemarketing_sales_rule,Expert,0.7872340425531915
+DeepSeek,telemarketing_sales_rule,Naive-Calm,0.8085106382978723
+DeepSeek,telemarketing_sales_rule,Naive-Distressed,0.7659574468085106
+Claude Sonnet 4.6,diversity_2,Expert,0.9966329966329966
+Claude Sonnet 4.6,diversity_2,Naive-Calm,0.9595959595959596
+Claude Sonnet 4.6,diversity_2,Naive-Distressed,0.9326599326599326
+Claude Sonnet 4.6,diversity_6,Expert,0.9473684210526315
+Claude Sonnet 4.6,diversity_6,Naive-Calm,0.9192982456140351
+Claude Sonnet 4.6,diversity_6,Naive-Distressed,0.9543859649122807
+Claude Sonnet 4.6,hearsay,Expert,0.7446808510638298
+Claude Sonnet 4.6,hearsay,Naive-Calm,0.648936170212766
+Claude Sonnet 4.6,hearsay,Naive-Distressed,0.6382978723404256
+Claude Sonnet 4.6,international_citizenship_questions,Expert,0.6666666666666666
+Claude Sonnet 4.6,international_citizenship_questions,Naive-Calm,0.7293729372937293
+Claude Sonnet 4.6,international_citizenship_questions,Naive-Distressed,0.768976897689769
+Claude Sonnet 4.6,nys_judicial_ethics,Expert,0.8062283737024222
+Claude Sonnet 4.6,nys_judicial_ethics,Naive-Calm,0.7024221453287197
+Claude Sonnet 4.6,nys_judicial_ethics,Naive-Distressed,0.7301038062283737
+Claude Sonnet 4.6,personal_jurisdiction,Expert,0.94
+Claude Sonnet 4.6,personal_jurisdiction,Naive-Calm,0.94
+Claude Sonnet 4.6,personal_jurisdiction,Naive-Distressed,0.86
+Claude Sonnet 4.6,proa,Expert,0.989010989010989
+Claude Sonnet 4.6,proa,Naive-Calm,0.7802197802197802
+Claude Sonnet 4.6,proa,Naive-Distressed,0.5714285714285714
+Claude Sonnet 4.6,telemarketing_sales_rule,Expert,0.7446808510638298
+Claude Sonnet 4.6,telemarketing_sales_rule,Naive-Calm,0.8085106382978723
+Claude Sonnet 4.6,telemarketing_sales_rule,Naive-Distressed,0.8085106382978723

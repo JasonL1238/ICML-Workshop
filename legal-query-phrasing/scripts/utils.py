@@ -180,6 +180,7 @@ def call_claude(
     temperature: float = 0.0,
     max_tokens: int = 700,
     stop_sequences: list[str] | None = None,
+    system_prompt: str | None = None,
 ) -> tuple[str, dict]:
     """Call Claude and return (text_output, usage_dict).
 
@@ -192,6 +193,8 @@ def call_claude(
         temperature=temperature,
         messages=[{"role": "user", "content": prompt}],
     )
+    if system_prompt:
+        kwargs["system"] = system_prompt
     if stop_sequences:
         kwargs["stop_sequences"] = stop_sequences
     message = client.messages.create(**kwargs)
